@@ -1,6 +1,6 @@
 #include <Servo.h>    // Use Servo library
 //Version 1.0
-//Date: 6/29/2014
+//Date: 11/11/2014
 //Description: This is the first version of the controls code for my 
 //mechatronic arm. It features 6 servos controlled by PWM via 6 potentiometers.
 //There are no feedback sensors in this version (i.e. it is an Open Feedback 
