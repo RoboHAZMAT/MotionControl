@@ -3,7 +3,7 @@
 /* RoboHAZMAT Senior Design Team
  * Motion Control Group
  * Gerardo Bledt
- * November 9, 2014
+ * November 10, 2014
  *
  * Code written for the hand glove motion control glove for the RoboHAZMAT 
  * Senior Design project. Uses flex sensors along each of the fingers to 
