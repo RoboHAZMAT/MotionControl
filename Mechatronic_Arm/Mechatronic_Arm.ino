@@ -1,6 +1,6 @@
 #include <Servo.h>    // Use Servo library
 //Version 1.0
-//Date: 11/11/2014
+//Date: 11/12/2014
 //
 // Cleaned up code for optimizing speed.
 //
