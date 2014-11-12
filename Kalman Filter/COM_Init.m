@@ -1,3 +1,5 @@
+% Change to whatever COM ports correspond to the devices
+
 Ctrl_COM = 'COM12';
 IMU9_COM = 'COM13';
 LiDAR_COM = 'COM9';
