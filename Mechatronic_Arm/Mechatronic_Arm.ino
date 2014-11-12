@@ -16,6 +16,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 // Servos array in order from bottom of the arm up
+// Instantiate array
 // shoulderRotate : Servo 1 - A0
 // shoulderBend   : Servo 2 - A1
 // elbow          : Servo 3 - A2
