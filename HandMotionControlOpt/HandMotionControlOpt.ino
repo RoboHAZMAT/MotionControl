@@ -3,7 +3,7 @@
 /* RoboHAZMAT Senior Design Team
  * Motion Control Group
  * Gerardo Bledt
- * November 10, 2014
+ * November 12, 2014
  *
  * Code written for the hand glove motion control glove for the RoboHAZMAT 
  * Senior Design project. Uses flex sensors along each of the fingers to 
@@ -53,7 +53,7 @@ int i = 0;
 const int numSensors = 2;
 
 // Filtering constant 
-const int numReadings = 13;   
+const int numReadings = 10;   
 
 // Status LEDs
 int greenLED = 8;
@@ -174,7 +174,7 @@ int MoveMotor(int i,int reading,int readingBuffer[],Servo motor,int prevMotorPos
   totalReading = totalReading + readingBuffer[i];
   
   // Calculates the filtered reading and translates to Servo degree range
-  int motorPos = constrain(totalReading / numReadings,0,165);
+  int motorPos = constrain(totalReading / numReadings,0,175);
   
   // Moves the motors if the new position is more than 2 degrees from the
   // previous motor position
@@ -196,10 +196,9 @@ void loop() {
   // and constrain them in the Servo motor degree range
   int reading[numSensors];
   for (int k = 0; k < numSensors; k++) {
-    reading[k] = constrain(map(analogRead(pin[k]),minR[k],maxR[k],0,165),0,165); 
+    reading[k] = constrain(map(analogRead(pin[k]),minR[k],maxR[k],0,175),0,175); 
     motorPos[k] = MoveMotor(i,reading[k],readingBuffer[k],motor[k],motorPos[k]); 
   }  
-  
   // Increase the index variable, wrap around the filter constant
   i++;
   if (i >= numReadings) { i = 0; }
