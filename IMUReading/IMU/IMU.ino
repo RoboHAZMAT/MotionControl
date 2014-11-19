@@ -6,8 +6,8 @@
 // for both classes must be in the include path of your project
 #include <I2Cdev.h>
 #include <helper_3dmath.h>
+#include "MPU6050_6Axis_MotionApps20.h"
 #include <MPU6050.h>
-//#include "MPU6050_6Axis_MotionApps20.h"
 
 // class default I2C address is 0x68
 // specific I2C addresses may be passed as a parameter here
