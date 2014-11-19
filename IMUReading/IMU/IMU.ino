@@ -1,21 +1,20 @@
 // Arduino Wire library is required if I2Cdev I2CDEV_ARDUINO_WIRE implementation
 // is used in I2Cdev.h
 #include <Wire.h>
-
-// I2Cdev and MPU6050 must be installed as libraries, or else the .cpp/.h files
-// for both classes must be in the include path of your project
 #include <I2Cdev.h>
-#include <helper_3dmath.h>
-#include "MPU6050_6Axis_MotionApps20.h"
-#include <MPU6050.h>
 
-// class default I2C address is 0x68
-// specific I2C addresses may be passed as a parameter here
+// Libraries added to get IMU specific data
+#include <helper_3dmath.h>
+#include <MPU6050_6Axis_MotionApps20.h>
+//#include <MPU6050.h>
+
+// Class default I2C address is 0x68
+// Specific I2C addresses may be passed as a parameter here
 // AD0 low = 0x68 (default for InvenSense evaluation board)
 // AD0 high = 0x69
 MPU6050 IMU;
 
-// sets up time history variable
+// Sets up time history variable
 int timePrev = 0;
   
 // Readings for the accelerometer, gyroscope, and magnetometer
@@ -45,8 +44,8 @@ void setup()
   // Test connection to IMU
   Serial.println(IMU.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
 
+  // Calibrates the IMU 
   boolean calibrated = false;
-  
   while (!calibrated) {
     calibrated = Calibrate();
   }
@@ -79,13 +78,19 @@ boolean Calibrate() {
     }
   }
   
-  // take the average of each of the readings to determine sensor offsets
+  // Take the average of each of the readings to determine sensor offsets
   for (int x = 0; x < 3; x++) {
-    // gyro and mag mag not need cali stuff added
+    // NOTE: gyro and mag mag not need cali stuff added maybe
     accCali[x] += accHist[x] / caliReadings;
     gyroCali[x] += gyroHist[x] / caliReadings;
     magCali[x] += magHist[x] / caliReadings;
   }
+  
+  // Successfull calibration if it finds an offset for the acc and gyro
+  if ((accCali[0] > 0 || accCali[0] < 0) && (gyroCali[0] > 0 || gyroCali[0] < 0)) {
+    return true;
+  } 
+  return false;
 }
 
 /**
@@ -105,42 +110,76 @@ void ReadIMU() {
   }
 }
 
+/**
+ * Implements a standard Kalman Filter to integrate acc and gyro data.
+ */
 void KalmanFilter() {
   // ***** TO DO *****
 }
 
-
+/**
+ * Prints off the calibrated and converted data for the IMU.
+ */ 
 void printIMU() {
+  // Prints accelerometer data
   Serial.print("Acc:\t");
   Serial.print(acc[0]); Serial.print("\t");
   Serial.print(acc[1]); Serial.print("\t");
   Serial.print(acc[2]); Serial.print("\t");
+  
+  // Prints gyroscope angular velocity data
   Serial.print("|\tGyro:\t");
   Serial.print(gyro[0]); Serial.print("\t");
   Serial.print(gyro[1]); Serial.print("\t");
   Serial.print(gyro[2]); Serial.print("\t");
+  
+  // Prints gyroscope angular position data
+  Serial.print("|\tGyro Angle:\t");
+  Serial.print(gyroAngle[0]); Serial.print("\t");
+  Serial.print(gyroAngle[1]); Serial.print("\t");
+  Serial.print(gyroAngle[2]); Serial.print("\t");
+  
+  // Prints magnetometer data
   Serial.print("|\tMag:\t");
   Serial.print(mag[0]); Serial.print("\t");
   Serial.print(mag[1]); Serial.print("\t");
   Serial.print(mag[2]); Serial.print("\t");
-  Serial.print("|\tGyro Angle:\t");
-  Serial.print(gyroAngle[0]); Serial.print("\t");
-  Serial.print(gyroAngle[1]); Serial.print("\t");
-  Serial.println(gyroAngle[2]);
+  
+  // Prints the time measurements were taken at
+  Serial.println(timePrev);
 }
+
+
+
 // =======================================================================
+
+
+/**
+ * The main program loop that reads in the converted IMU data, integrates
+ * the gyroscope data to find the orientation angles of the IMU. Then the 
+ * data is run through a Kalman filter to cancel out the IMU drift.
+ */
 void loop()
 {
   // Read the IMU sensor values and convert to SI units
   ReadIMU();
+  
+  // Finds the time since last loop
   int timeCurr = millis();
   int dt = timeCurr - timePrev;
   timePrev = timeCurr;
+  
+  // Integration for the gyroscope data to find the gyroscope angle
   for (int x = 0; x < 3; x++) {
     gyroAngle[x] += gyro[x]*dt/1000;
   }
   
+  // Prints the converted IMU data
   printIMU();
+  
+  /*
   // Kalman Filter on the IMU data
-  // KalmanFilter();
+  KalmanFilter();
+  printIMU();
+  */
 }
