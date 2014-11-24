@@ -19,12 +19,20 @@
  *    - Calibrate
  *    - printIMU
  *    - KalmanFilter
+ *    - KFPrediction
+ *    - KFCorrection
  *
  * 3. Main Loop: 
  * 
  *    *** TO DO ***
  *     - Optimize code for speed.
- *     - Kalman Filter method
+ *     - Get magnetometer readings to work
+ *     - Yaw KF correction
+ *     - Fix atan limits
+ *     - Adaptive covariance accounting for non gravity acceleration
+ *     - Make code more efficient (reduce size: currently 12kB +)
+ *     - Filtering method on the raw data to remove noise (more?)
+ *     - Possibly change the final gyroAngleKF measurements to int
  *     - Possibly need to use quaternions
  */
  
@@ -45,29 +53,49 @@
 // Initializes MPU6050 class (default I2C address is 0x68)
 MPU6050 IMU;
 
+// Constant for pi
+const float pi = 3.141592;
+
+// Number of readings for smoothing noise 
+const int numReadings = 10;
+
+// Indexing variable
+int i = 0;
+
 // Sets up time history variable
 unsigned long timePrev = 0;
 
-const float pi = 3.141592;
-  
-// Readings for the accelerometer, gyroscope, and magnetometer
-int16_t acc[3] = {0,0,0};
-int16_t gyro[3] = {0,0,0};
-int16_t mag[3] = {0,0,0};
-
 // Corrected and converted readings for the accelerometer, gyroscope, and magnetometer
-float accC[3] = {0,0,0};
-float gyroC[3] = {0,0,0};
-float magC[3] = {0,0,0};
+float acc[3] = {0,0,0};
+float gyro[3] = {0,0,0};
+float mag[3] = {0,0,0};
+
+// Total readings for each of the DOF
+long accTotalReading[3] = {0,0,0};
+long gyroTotalReading[3] = {0,0,0};
+long magTotalReading[3] = {0,0,0};
+
+// Buffers for each of the DOF for smoothing
+float accBuffer[numReadings][3];
+float gyroBuffer[numReadings][3];
+float magBuffer[numReadings][3];
 
 // Direct integration for gyroscopic angle
 float gyroAngle[3] = {0,0,0};
 
 // Kalman Filter angle Estimation
-float gyroAngleKF[3] = {0,0,0}; // roll, pitch, yaw
+float gyroKF[3] = {0,0,0}; // roll, pitch, yaw
 
 // Kalman Filter Covariance 
-float sigmaKF[3] = {1,1,1}; // roll, pitch, yaw
+float sigmaKF[3] = {0,0,0}; // roll, pitch, yaw
+
+// Buffer for the roll, pitch, yaw KF estimates 
+float gyroBufferKF[numReadings][3]; // = {0,0,0}; // roll, pitch, yaw
+
+// Additive roll, pitch, yaw values
+float rollTotalReading = 0;
+float pitchTotalReading = 0;
+float yawTotalReading = 0;
 
 // Calibration constants for the accelerometer, gyroscope, and magnetometer
 float accCali[3] = {0,0,0};  // may have to add the -g 
@@ -89,12 +117,23 @@ void setup()
   // Test connection to IMU
   Serial.println(IMU.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
 
+  // Set up reading buffers to zeros
+  for (int x = 0; x < 3; x++) {
+    for (int k = 0; k < numReadings; k++) {
+      accBuffer[k][x] = 0;
+      gyroBuffer[k][x] = 0;
+      magBuffer[k][x] = 0; 
+      gyroBufferKF[k][x] = 0;
+    }  
+  }
+
   // Calibrates the IMU 
   boolean calibrated = false;
   while (!calibrated) {
     Serial.println("Calibrating IMU Readings...");
     calibrated = Calibrate();
   }
+  timePrev = millis();
 }
 
 // ========================================================================
@@ -109,20 +148,29 @@ boolean Calibrate() {
   // Number of readings to take during calibration
   int caliReadings = 5000;
   
+  // Readings for the accelerometer, gyroscope, and magnetometer
+  int16_t a[3] = {0,0,0}; 
+  int16_t g[3] = {0,0,0};
+  int16_t m[3] = {0,0,0};
+  
   // History vectors for the readings
   long accHist[3] = {0,0,0};
   long gyroHist[3] = {0,0,0};
-  //int16_t magHist[3] = {0,0,0};
+  //long magHist[3] = {0,0,0};
   
   // Find total readings for the number of readings specified
-  for (int i = 0; i < caliReadings; i++) {
-    IMU.getMotion9(&acc[0], &acc[1], &acc[2], &gyro[0], &gyro[1], &gyro[2], &mag[0], &mag[1], &mag[2]);
+  for (int k = 0; k < caliReadings; k++) {
+    IMU.getMotion9(&a[0], &a[1], &a[2], &g[0], &g[1], &g[2], &m[0], &m[1], &m[2]);
     for (int x = 0; x < 3; x++) {
-      accHist[x] += acc[x];
-      gyroHist[x] += gyro[x];
-      // magHist[x] += mag[x];
+      accHist[x] += a[x];
+      gyroHist[x] += g[x];
+      // magHist[x] += m[x];
+    }
+    if (k % 1000 == 0) {
+      Serial.print(k/1000);Serial.print("..."); 
     }
   }
+  Serial.println("");
   // Take the average of the readings to determine sensor offsets
   for (int x = 0; x < 3; x++) {
     // NOTE: gyro and mag mag not need cali stuff added maybe
@@ -130,6 +178,7 @@ boolean Calibrate() {
     gyroCali[x] += gyroHist[x] / caliReadings;
     //magCali[x] += magHist[x] / caliReadings;
   }
+  Serial.println("Done Calibrating.");
   return true;
 }
 
@@ -139,51 +188,104 @@ boolean Calibrate() {
  * +/- 1200 microT for the magnetometer to convert into usable SI units.
  */
 void ReadIMU() {
-  // MPU6050 function to parse data
-  IMU.getMotion9(&acc[0], &acc[1], &acc[2], &gyro[0], &gyro[1], &gyro[2], &mag[0], &mag[1], &mag[2]);
+  // Readings for the accelerometer, gyroscope, and magnetometer
+  int16_t a[3] = {0,0,0}; 
+  int16_t g[3] = {0,0,0};
+  int16_t m[3] = {0,0,0};
   
-  // Convert each measurement into SI units
+  // MPU6050 function to parse data
+  IMU.getMotion9(&a[0], &a[1], &a[2], &g[0], &g[1], &g[2], &m[0], &m[1], &m[2]);  
+  
   for (int x = 0; x < 3; x++) {
-    accC[x] = ((float)acc[x] - accCali[x]) * 9.81 / 16384;    // m/s^2
-    gyroC[x] = ((float)gyro[x] - gyroCali[x]) * 250 / 32768;  // degrees/s
-    magC[x] = ((float)mag[x] - magCali[x]) * 1200 / 32768;    // microT
+    accTotalReading[x] -= accBuffer[i][x];
+    accBuffer[i][x] = a[x];
+    accTotalReading[x] += a[x]; 
+    
+    gyroTotalReading[x] -= gyroBuffer[i][x];
+    gyroBuffer[i][x] = g[x];
+    gyroTotalReading[x] += g[x]; 
+    
+    magTotalReading[x] -= magBuffer[i][x];
+    magBuffer[i][x] = m[x];
+    magTotalReading[x] += m[x]; 
+    
+    // Convert each measurement into SI units  
+    acc[x] = ((float)(accTotalReading[x]/numReadings) - accCali[x]) * 9.81 / 16384;    // m/s^2
+    gyro[x] = ((float)(gyroTotalReading[x]/numReadings) - gyroCali[x]) * 250 / 32768;  // degrees/s
+    mag[x] = ((float)(magTotalReading[x]/numReadings) - magCali[x]) * 1200 / 32768;    // microT
   }
-  accC[2] = ((float)acc[2]) * 9.81 / 16384;
+  acc[2] = ((float)accTotalReading[2]/numReadings) * 9.81 / 16384;
 }
 
 /**
  * Implements a standard Kalman Filter to integrate acc and gyro data.
  */
 void KalmanFilter(int dt) {
-  // ***** TO DO *****
-  float w = (10*dt*pi/180);
-  float v = (1*pi/180);
+  // Prediction noise error
+  float w = sq(1*dt*pi/180);
+  // Correction noise error
+  float v = sq(1*pi/180);
+  
   // Roll`
-  float roll = atan(accC[1] / sqrt(accC[0]*accC[0] + accC[2]*accC[2]))*180/pi;
-  KFPrediction(0, gyroC[0], w);
+  // Measurement for roll from the accelerometer
+  float roll = atan(acc[1] / sqrt(acc[0]*acc[0] + acc[2]*acc[2]))*180/pi;
+  // Run KF prediction and correction with noise reduction
+  rollTotalReading -= gyroBufferKF[i][0];
+  KFPrediction(0, gyro[0], w);
   KFCorrection(0, roll, v);
+  rollTotalReading += gyroBufferKF[i][0];
+  // Final roll estimate
+  gyroKF[0] = rollTotalReading/numReadings;
+  
   // Pitch
-  float pitch = atan(-accC[0] / accC[2])*180/pi;
-  KFPrediction(1, gyroC[1], w);
+  // Measurement for pitch from accelerometer
+  float pitch = atan(-acc[0] / acc[2])*180/pi;
+  // Run KF prediction and correction with noise reduction
+  pitchTotalReading -= gyroBufferKF[i][1];
+  KFPrediction(1, gyro[1], w);
   KFCorrection(1, pitch, v);
+  pitchTotalReading += gyroBufferKF[i][1];
+  // Final pitch estimate
+  gyroKF[1] = pitchTotalReading/numReadings;
+  
   // Yaw
-  float yaw = 0.00;
-  KFPrediction(2, gyroC[2], w);  
+  // Measurement for yaw from magnetometer
+  float yaw = gyroAngle[2];
+  // Run KF prediction and correction with noise reduction
+  yawTotalReading -= gyroBufferKF[i][2];
+  KFPrediction(2, gyro[2], w);  
   KFCorrection(2, yaw, v);
+  yawTotalReading += gyroBufferKF[i][2];
+  // Final yaw estimate
+  gyroKF[2] = yawTotalReading/numReadings;
 }
 
+/**
+ * Prediction method for the Kalman Filter
+ * x_k|k0 = A*x_k0 + B*u_k
+ * sigma_k|k0 = A*sigma_k0*A' + w
+ */
 void KFPrediction(int x, float uk, float w) {
   int A = 1;
   int B = 1;
-  gyroAngleKF[x] = A*gyroAngleKF[x] + B*uk;
-  sigmaKF[x] = A*sigmaKF[x]*A + w*w;
+  // Predicted state and covariance
+  gyroBufferKF[i][x] = A*gyroBufferKF[i][x] + B*uk;
+  sigmaKF[x] = A*sigmaKF[x]*A + w;
 }
 
+/**
+ * Correction method for the Kalman Filter
+ * K = sigma_k|k0*C/(C*sigma_k|k0*C' + v)
+ * x_k|k = x_k|k0 + K*(z_k - c*x_k|k0)
+ * sigma_k|k = (1 - K*C)*x_k|k
+ */
 void KFCorrection(int x, float zk, float v) {
   int C = 1;
+  // Kalman gain calculation
   float K = sigmaKF[x]*C/(C*sigmaKF[x]*C + v);
-  gyroAngleKF[x] = gyroAngleKF[x] + K*(zk - C*gyroAngleKF[x]);
-  sigmaKF[x] = (1 - K*C)*gyroAngleKF[x];
+  // Corrected state and covariance
+  gyroBufferKF[i][x] = gyroBufferKF[i][x] + K*(zk - C*gyroBufferKF[i][x]);
+  sigmaKF[x] = (1 - K*C)*gyroBufferKF[i][x];
 }
 
 /**
@@ -192,15 +294,15 @@ void KFCorrection(int x, float zk, float v) {
 void printIMU() {
   // Prints accelerometer data
   Serial.print("Acc:\t");
-  Serial.print(accC[0]); Serial.print("\t");
-  Serial.print(accC[1]); Serial.print("\t");
-  Serial.print(accC[2]); Serial.print("\t");
+  Serial.print(acc[0]); Serial.print("\t");
+  Serial.print(acc[1]); Serial.print("\t");
+  Serial.print(acc[2]); Serial.print("\t");
   
   // Prints gyroscope angular velocity data
   Serial.print("|\tGyro:\t");
-  Serial.print(gyroC[0]); Serial.print("\t");
-  Serial.print(gyroC[1]); Serial.print("\t");
-  Serial.print(gyroC[2]); Serial.print("\t");
+  Serial.print(gyro[0]); Serial.print("\t");
+  Serial.print(gyro[1]); Serial.print("\t");
+  Serial.print(gyro[2]); Serial.print("\t");
   
   // Prints gyroscope angular position data
   Serial.print("|\tGyro Angle:\t");
@@ -210,15 +312,15 @@ void printIMU() {
   
   // Prints gyroscope angular position data
   Serial.print("|\tGyro Angle:\t");
-  Serial.print(gyroAngleKF[0]); Serial.print("\t");
-  Serial.print(gyroAngleKF[1]); Serial.print("\t");
-  Serial.print(gyroAngleKF[2]); Serial.print("\t");
+  Serial.print(gyroKF[0]); Serial.print("\t");
+  Serial.print(gyroKF[1]); Serial.print("\t");
+  Serial.print(gyroKF[2]); Serial.print("\t");
   
   // Prints magnetometer data
   //Serial.print("|\tMag:\t");
-  //Serial.print(magC[0]); Serial.print("\t");
-  //Serial.print(magC[1]); Serial.print("\t");
-  //Serial.print(magC[2]); Serial.print("\t");
+  //Serial.print(mag[0]); Serial.print("\t");
+  //Serial.print(mag[1]); Serial.print("\t");
+  //Serial.print(mag[2]); Serial.print("\t");
   
   // Prints the time measurements were taken at
   Serial.println(timePrev);
@@ -246,15 +348,19 @@ void loop()
   
   // Integration for the gyroscope data to find the gyroscope angle
   for (int x = 0; x < 3; x++) {
-    gyroAngle[x] += gyroC[x]*dt/1000; // degrees
+    gyroAngle[x] += gyro[x]*dt/1000; // degrees
   }
-  
-  // Prints the converted IMU data
-  printIMU();
-  
   
   // Kalman Filter on the IMU data
   KalmanFilter(dt);
+  
+  // Prints the calculated IMU data
   printIMU();
   
+  // Increase the index variable, wrap around the filter constant
+  i++;
+  if (i >= numReadings) { i = 0; }
+  
+  // Delay for stability
+  delay(1); 
 }
