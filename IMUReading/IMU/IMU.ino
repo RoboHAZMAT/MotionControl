@@ -231,7 +231,7 @@ void KalmanFilter(int dt) {
   float roll = atan(acc[1] / sqrt(acc[0]*acc[0] + acc[2]*acc[2]))*180/pi;
   // Run KF prediction and correction with noise reduction
   rollTotalReading -= gyroBufferKF[i][0];
-  KFPrediction(0, gyro[0], w);
+  KFPrediction(0, gyro[0]*dt, w);
   KFCorrection(0, roll, v);
   rollTotalReading += gyroBufferKF[i][0];
   // Final roll estimate
@@ -242,7 +242,7 @@ void KalmanFilter(int dt) {
   float pitch = atan(-acc[0] / acc[2])*180/pi;
   // Run KF prediction and correction with noise reduction
   pitchTotalReading -= gyroBufferKF[i][1];
-  KFPrediction(1, gyro[1], w);
+  KFPrediction(1, gyro[1]*dt, w);
   KFCorrection(1, pitch, v);
   pitchTotalReading += gyroBufferKF[i][1];
   // Final pitch estimate
@@ -253,7 +253,7 @@ void KalmanFilter(int dt) {
   float yaw = gyroAngle[2];
   // Run KF prediction and correction with noise reduction
   yawTotalReading -= gyroBufferKF[i][2];
-  KFPrediction(2, gyro[2], w);  
+  KFPrediction(2, gyro[2]*dt, w);  
   KFCorrection(2, yaw, v);
   yawTotalReading += gyroBufferKF[i][2];
   // Final yaw estimate
