@@ -46,20 +46,33 @@
 MPU6050 IMU;
 
 // Sets up time history variable
-int timePrev = 0;
+unsigned long timePrev = 0;
+
+const float pi = 3.141592;
   
 // Readings for the accelerometer, gyroscope, and magnetometer
 int16_t acc[3] = {0,0,0};
 int16_t gyro[3] = {0,0,0};
 int16_t mag[3] = {0,0,0};
 
-// Direct integration for gyroscopic angle
-int16_t gyroAngle[3] = {0,0,0};
+// Corrected and converted readings for the accelerometer, gyroscope, and magnetometer
+float accC[3] = {0,0,0};
+float gyroC[3] = {0,0,0};
+float magC[3] = {0,0,0};
 
-// Readings for the accelerometer, gyroscope, and magnetometer
-int16_t accCali[3] = {0,0,0};  // may have to add the -g 
-int16_t gyroCali[3] = {0,0,0};
-int16_t magCali[3] = {0,0,0};
+// Direct integration for gyroscopic angle
+float gyroAngle[3] = {0,0,0};
+
+// Kalman Filter angle Estimation
+float gyroAngleKF[3] = {0,0,0}; // roll, pitch, yaw
+
+// Kalman Filter Covariance 
+float sigmaKF[3] = {1,1,1}; // roll, pitch, yaw
+
+// Calibration constants for the accelerometer, gyroscope, and magnetometer
+float accCali[3] = {0,0,0};  // may have to add the -g 
+float gyroCali[3] = {0,0,0};
+float magCali[3] = {0,0,0};
 
 void setup()
 {
@@ -79,6 +92,7 @@ void setup()
   // Calibrates the IMU 
   boolean calibrated = false;
   while (!calibrated) {
+    Serial.println("Calibrating IMU Readings...");
     calibrated = Calibrate();
   }
 }
@@ -96,8 +110,8 @@ boolean Calibrate() {
   int caliReadings = 5000;
   
   // History vectors for the readings
-  int16_t accHist[3] = {0,0,0};
-  int16_t gyroHist[3] = {0,0,0};
+  long accHist[3] = {0,0,0};
+  long gyroHist[3] = {0,0,0};
   //int16_t magHist[3] = {0,0,0};
   
   // Find total readings for the number of readings specified
@@ -109,7 +123,6 @@ boolean Calibrate() {
       // magHist[x] += mag[x];
     }
   }
-  
   // Take the average of the readings to determine sensor offsets
   for (int x = 0; x < 3; x++) {
     // NOTE: gyro and mag mag not need cali stuff added maybe
@@ -117,12 +130,7 @@ boolean Calibrate() {
     gyroCali[x] += gyroHist[x] / caliReadings;
     //magCali[x] += magHist[x] / caliReadings;
   }
-  
-  // Successfull calibration if it finds an offset for the acc and gyro
-  if ((accCali[0] > 0 || accCali[0] < 0) && (gyroCali[0] > 0 || gyroCali[0] < 0)) {
-    return true;
-  } 
-  return false;
+  return true;
 }
 
 /**
@@ -136,17 +144,46 @@ void ReadIMU() {
   
   // Convert each measurement into SI units
   for (int x = 0; x < 3; x++) {
-    acc[x] = (acc[x] - accCali[x]) * 9.81 / 16384;    // m/s^2
-    gyro[x] = (gyro[x] - gyroCali[x]) * 250 / 32768;  // degrees/s
-    mag[x] = (mag[x] - magCali[x]) * 1200 / 32768;    // microT
+    accC[x] = ((float)acc[x] - accCali[x]) * 9.81 / 16384;    // m/s^2
+    gyroC[x] = ((float)gyro[x] - gyroCali[x]) * 250 / 32768;  // degrees/s
+    magC[x] = ((float)mag[x] - magCali[x]) * 1200 / 32768;    // microT
   }
+  accC[2] = ((float)acc[2]) * 9.81 / 16384;
 }
 
 /**
  * Implements a standard Kalman Filter to integrate acc and gyro data.
  */
-void KalmanFilter() {
+void KalmanFilter(int dt) {
   // ***** TO DO *****
+  float w = (10*dt*pi/180);
+  float v = (1*pi/180);
+  // Roll`
+  float roll = atan(accC[1] / sqrt(accC[0]*accC[0] + accC[2]*accC[2]))*180/pi;
+  KFPrediction(0, gyroC[0], w);
+  KFCorrection(0, roll, v);
+  // Pitch
+  float pitch = atan(-accC[0] / accC[2])*180/pi;
+  KFPrediction(1, gyroC[1], w);
+  KFCorrection(1, pitch, v);
+  // Yaw
+  float yaw = 0.00;
+  KFPrediction(2, gyroC[2], w);  
+  KFCorrection(2, yaw, v);
+}
+
+void KFPrediction(int x, float uk, float w) {
+  int A = 1;
+  int B = 1;
+  gyroAngleKF[x] = A*gyroAngleKF[x] + B*uk;
+  sigmaKF[x] = A*sigmaKF[x]*A + w*w;
+}
+
+void KFCorrection(int x, float zk, float v) {
+  int C = 1;
+  float K = sigmaKF[x]*C/(C*sigmaKF[x]*C + v);
+  gyroAngleKF[x] = gyroAngleKF[x] + K*(zk - C*gyroAngleKF[x]);
+  sigmaKF[x] = (1 - K*C)*gyroAngleKF[x];
 }
 
 /**
@@ -155,15 +192,15 @@ void KalmanFilter() {
 void printIMU() {
   // Prints accelerometer data
   Serial.print("Acc:\t");
-  Serial.print(acc[0]); Serial.print("\t");
-  Serial.print(acc[1]); Serial.print("\t");
-  Serial.print(acc[2]); Serial.print("\t");
+  Serial.print(accC[0]); Serial.print("\t");
+  Serial.print(accC[1]); Serial.print("\t");
+  Serial.print(accC[2]); Serial.print("\t");
   
   // Prints gyroscope angular velocity data
   Serial.print("|\tGyro:\t");
-  Serial.print(gyro[0]); Serial.print("\t");
-  Serial.print(gyro[1]); Serial.print("\t");
-  Serial.print(gyro[2]); Serial.print("\t");
+  Serial.print(gyroC[0]); Serial.print("\t");
+  Serial.print(gyroC[1]); Serial.print("\t");
+  Serial.print(gyroC[2]); Serial.print("\t");
   
   // Prints gyroscope angular position data
   Serial.print("|\tGyro Angle:\t");
@@ -171,11 +208,17 @@ void printIMU() {
   Serial.print(gyroAngle[1]); Serial.print("\t");
   Serial.print(gyroAngle[2]); Serial.print("\t");
   
+  // Prints gyroscope angular position data
+  Serial.print("|\tGyro Angle:\t");
+  Serial.print(gyroAngleKF[0]); Serial.print("\t");
+  Serial.print(gyroAngleKF[1]); Serial.print("\t");
+  Serial.print(gyroAngleKF[2]); Serial.print("\t");
+  
   // Prints magnetometer data
-  Serial.print("|\tMag:\t");
-  Serial.print(mag[0]); Serial.print("\t");
-  Serial.print(mag[1]); Serial.print("\t");
-  Serial.print(mag[2]); Serial.print("\t");
+  //Serial.print("|\tMag:\t");
+  //Serial.print(magC[0]); Serial.print("\t");
+  //Serial.print(magC[1]); Serial.print("\t");
+  //Serial.print(magC[2]); Serial.print("\t");
   
   // Prints the time measurements were taken at
   Serial.println(timePrev);
@@ -197,21 +240,21 @@ void loop()
   ReadIMU();
   
   // Finds the time since last loop (dt)
-  int timeCurr = millis();
+  unsigned long timeCurr = millis();
   int dt = timeCurr - timePrev; // ms
   timePrev = timeCurr;
   
   // Integration for the gyroscope data to find the gyroscope angle
   for (int x = 0; x < 3; x++) {
-    gyroAngle[x] += gyro[x]*dt/1000; // degrees
+    gyroAngle[x] += gyroC[x]*dt/1000; // degrees
   }
   
   // Prints the converted IMU data
   printIMU();
   
-  /*
+  
   // Kalman Filter on the IMU data
-  KalmanFilter();
+  KalmanFilter(dt);
   printIMU();
-  */
+  
 }
