@@ -16,6 +16,7 @@
 //Libraries
 #include <Servo.h>  //Servo library
 #include <Wire.h>   //I2C library
+#include <I2C_Anything.h>
 
 // Servos array in order from bottom of the arm up
 // shoulderRotate : Servo 1 - motor[0]
@@ -29,7 +30,7 @@
 Servo motor[6];
 long rd[6];
 int p = 0;
-
+long rec = 0;
 ///////////////////////////////////////////////////////////////////////////////
 
 void setup()
@@ -37,6 +38,7 @@ void setup()
   //I2C setup
   Wire.begin(30);    //join I2C bus with address #30 
   Wire.onReceive(receiveEvent); //register event
+  Serial.begin(9600);
   
   //Connect servos to pwm pins
   motor[0].attach(11);
@@ -47,8 +49,20 @@ void setup()
   motor[5].attach(3);
   
   //I2C
- long rd[] = {90,90,90,90,90,90}; //initiate array at resting position in case comm does
+// for (int n = 0; n < 6; n++)
+// {
+//   rd[n] = 90;
+// }
+  rd[0] = 90;
+  rd[1] = 130;
+  rd[2] = 100;
+  rd[3] = 90;
+  rd[4] = 90;
+  rd[5] = 45;
+ //initiate array at resting position in case comm does
                            //not start right away
+ long rec = 0;  
+                         
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -57,10 +71,17 @@ void loop()
 {
   
 //Loops through each servo reading (except the gripper which is handled digitally)
+Wire.requestFrom(30,44);
   for (int k = 0; k < 6; k++) {
     motor[k].write(rd[k]);
   }
   delay(15);
+  Serial.println(rd[0]);
+  Serial.println(rd[1]);
+  Serial.println(rd[2]);
+  Serial.println(rd[3]);
+  Serial.println(rd[4]);
+  Serial.println(rd[5]);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -68,11 +89,14 @@ void loop()
 void receiveEvent(int howMany)
 {
   p=0; //counting variable
-  while(Wire.available() > 0)
-  {
-    rd[p] = Wire.read();
-    p = p+1;
-  }
+  I2C_readAnything(rec);
+  Serial.print("poop");
+  Serial.print(rec);
+//  while(Wire.available() > 0)
+//  {
+//    rd[p] = Wire.read();
+//    p = p+1;
+//  }
   // intended to recieve an array indicating the positions of the servos
   
 }
