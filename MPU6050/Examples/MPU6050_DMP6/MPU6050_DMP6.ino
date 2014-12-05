@@ -199,7 +199,7 @@ void setup() {
         mpuIntStatus = mpu.getIntStatus();
 
         // set our DMP Ready flag so the main loop() function knows it's okay to use it
-        Serial.println(F("DMP ready! Waiting for first interrupt..."));
+        Serial.println(F("DMP ready! Waiting for first interrupte..."));
         dmpReady = true;
 
         // get expected DMP packet size for later comparison
@@ -344,6 +344,7 @@ void loop() {
             teapotPacket[7] = fifoBuffer[9];
             teapotPacket[8] = fifoBuffer[12];
             teapotPacket[9] = fifoBuffer[13];
+            //Serial.println(((teapotPacket[2] << 8) | teapotPacket[3]) / 16384.0f);
             Serial.write(teapotPacket, 14);
             teapotPacket[11]++; // packetCount, loops at 0xFF on purpose
         #endif

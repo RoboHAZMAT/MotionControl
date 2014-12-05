@@ -46,12 +46,14 @@
 #include <I2Cdev.h>
 
 // Libraries added to get IMU specific data
-#include <helper_3dmath.h>
-#include <MPU6050_6Axis_MotionApps20.h>
+#include "helper_3dmath.h"
+#include "MPU6050_6Axis_MotionApps20.h"
+#include "AK8975.h"
 //#include <MPU6050.h>
 
 // Initializes MPU6050 class (default I2C address is 0x68)
 MPU6050 IMU;
+AK8975 Mag(0x0C);
 
 // Constant for pi
 const float pi = 3.141592;
@@ -113,10 +115,14 @@ void setup()
   // Initialize the IMU
   Serial.println("Initializing IMU...");
   IMU.initialize();
+  Serial.println("Initializing Magnetometer...");
+  Mag.initialize();
   
   // Test connection to IMU
+  Serial.println("Testing connections...");
   Serial.println(IMU.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
-
+  Serial.println(Mag.testConnection() ? "AK8975 connection successful" : "AK8975 connection failed");
+  
   // Set up reading buffers to zeros
   for (int x = 0; x < 3; x++) {
     for (int k = 0; k < numReadings; k++) {
@@ -160,7 +166,8 @@ boolean Calibrate() {
   
   // Find total readings for the number of readings specified
   for (int k = 0; k < caliReadings; k++) {
-    IMU.getMotion9(&a[0], &a[1], &a[2], &g[0], &g[1], &g[2], &m[0], &m[1], &m[2]);
+    //IMU.getMotion9(&a[0], &a[1], &a[2], &g[0], &g[1], &g[2], &m[0], &m[1], &m[2]);
+    IMU.getMotion6(&a[0], &a[1], &a[2], &g[0], &g[1], &g[2]);  
     for (int x = 0; x < 3; x++) {
       accHist[x] += a[x];
       gyroHist[x] += g[x];
@@ -194,7 +201,10 @@ void ReadIMU() {
   int16_t m[3] = {0,0,0};
   
   // MPU6050 function to parse data
-  IMU.getMotion9(&a[0], &a[1], &a[2], &g[0], &g[1], &g[2], &m[0], &m[1], &m[2]);  
+  //IMU.getMotion9(&a[0], &a[1], &a[2], &g[0], &g[1], &g[2], &m[0], &m[1], &m[2]);  
+  IMU.getMotion6(&a[0], &a[1], &a[2], &g[0], &g[1], &g[2]); 
+  //IMU.getMag(&m[0], &m[1], &m[2]); 
+
   
   for (int x = 0; x < 3; x++) {
     accTotalReading[x] -= accBuffer[i][x];
@@ -228,7 +238,8 @@ void KalmanFilter(int dt) {
   
   // Roll`
   // Measurement for roll from the accelerometer
-  float roll = atan(acc[1] / sqrt(acc[0]*acc[0] + acc[2]*acc[2]))*180/pi;
+  //float roll = atan(acc[1] / sqrt(acc[0]*acc[0] + acc[2]*acc[2]))*180/pi;
+  float roll = atan(acc[1] / sqrt(sq(acc[0]) + sq(acc[2])))*180/pi;
   // Run KF prediction and correction with noise reduction
   rollTotalReading -= gyroBufferKF[i][0];
   KFPrediction(0, gyro[0]*dt, w);
@@ -239,7 +250,8 @@ void KalmanFilter(int dt) {
   
   // Pitch
   // Measurement for pitch from accelerometer
-  float pitch = atan(-acc[0] / acc[2])*180/pi;
+  //float pitch = atan(-acc[0] / acc[2])*180/pi;
+  float pitch = atan(acc[0] / sqrt(sq(acc[1]) + sq(acc[2])))*180/pi;
   // Run KF prediction and correction with noise reduction
   pitchTotalReading -= gyroBufferKF[i][1];
   KFPrediction(1, gyro[1]*dt, w);
@@ -305,10 +317,10 @@ void printIMU() {
   Serial.print(gyro[2]); Serial.print("\t");
   
   // Prints gyroscope angular position data
-  Serial.print("|\tGyro Angle:\t");
-  Serial.print(gyroAngle[0]); Serial.print("\t");
-  Serial.print(gyroAngle[1]); Serial.print("\t");
-  Serial.print(gyroAngle[2]); Serial.print("\t");
+  //Serial.print("|\tGyro Angle:\t");
+  //Serial.print(gyroAngle[0]); Serial.print("\t");
+  //Serial.print(gyroAngle[1]); Serial.print("\t");
+  //Serial.print(gyroAngle[2]); Serial.print("\t");
   
   // Prints gyroscope angular position data
   Serial.print("|\tGyro Angle:\t");
@@ -317,10 +329,10 @@ void printIMU() {
   Serial.print(gyroKF[2]); Serial.print("\t");
   
   // Prints magnetometer data
-  //Serial.print("|\tMag:\t");
-  //Serial.print(mag[0]); Serial.print("\t");
-  //Serial.print(mag[1]); Serial.print("\t");
-  //Serial.print(mag[2]); Serial.print("\t");
+  Serial.print("|\tMag:\t");
+  Serial.print(mag[0]); Serial.print("\t");
+  Serial.print(mag[1]); Serial.print("\t");
+  Serial.print(mag[2]); Serial.print("\t");
   
   // Prints the time measurements were taken at
   Serial.println(timePrev);
