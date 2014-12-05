@@ -198,7 +198,7 @@ void loop() {
   for (int k = 0; k < numSensors; k++) {
     reading[k] = constrain(map(analogRead(pin[k]),minR[k],maxR[k],0,175),0,175); 
     motorPos[k] = MoveMotor(i,reading[k],readingBuffer[k],motor[k],motorPos[k]); 
-  }  
+  }
   // Increase the index variable, wrap around the filter constant
   i++;
   if (i >= numReadings) { i = 0; }

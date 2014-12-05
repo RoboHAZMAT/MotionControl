@@ -68,10 +68,10 @@ void setup() {
     println(Serial.list());
 
     // get the first available port (use EITHER this OR the specific port code below)
-    String portName = Serial.list()[0];
+    //String portName = Serial.list()[0];
     
     // get a specific serial port (use EITHER this OR the first-available code above)
-    //String portName = "COM4";
+    String portName = "COM8";
     
     // open the serial port
     port = new Serial(this, portName, 115200);
@@ -146,7 +146,7 @@ void serialEvent(Serial port) {
     while (port.available() > 0) {
         int ch = port.read();
         print((char)ch);
-        if (aligned < 4) {
+        /*if (aligned < 4) {
             // make sure we are properly aligned on a 14-byte packet
             if (serialCount == 0) {
                 if (ch == '$') aligned++; else aligned = 0;
@@ -161,6 +161,7 @@ void serialEvent(Serial port) {
             serialCount++;
             if (serialCount == 14) serialCount = 0;
         } else {
+          */
             if (serialCount > 0 || ch == '$') {
                 teapotPacket[serialCount++] = (char)ch;
                 if (serialCount == 14) {
@@ -176,7 +177,7 @@ void serialEvent(Serial port) {
                     // set our toxilibs quaternion to new data
                     quat.set(q[0], q[1], q[2], q[3]);
 
-                    /*
+                    
                     // below calculations unnecessary for orientation only using toxilibs
                     
                     // calculate gravity vector
@@ -195,12 +196,12 @@ void serialEvent(Serial port) {
                     ypr[2] = atan(gravity[1] / sqrt(gravity[0]*gravity[0] + gravity[2]*gravity[2]));
         
                     // output various components for debugging
-                    //println("q:\t" + round(q[0]*100.0f)/100.0f + "\t" + round(q[1]*100.0f)/100.0f + "\t" + round(q[2]*100.0f)/100.0f + "\t" + round(q[3]*100.0f)/100.0f);
-                    //println("euler:\t" + euler[0]*180.0f/PI + "\t" + euler[1]*180.0f/PI + "\t" + euler[2]*180.0f/PI);
-                    //println("ypr:\t" + ypr[0]*180.0f/PI + "\t" + ypr[1]*180.0f/PI + "\t" + ypr[2]*180.0f/PI);
-                    */
+                    println("q:\t" + round(q[0]*100.0f)/100.0f + "\t" + round(q[1]*100.0f)/100.0f + "\t" + round(q[2]*100.0f)/100.0f + "\t" + round(q[3]*100.0f)/100.0f);
+                    println("euler:\t" + euler[0]*180.0f/PI + "\t" + euler[1]*180.0f/PI + "\t" + euler[2]*180.0f/PI);
+                    println("ypr:\t" + ypr[0]*180.0f/PI + "\t" + ypr[1]*180.0f/PI + "\t" + ypr[2]*180.0f/PI);
+                    
                 }
-            }
+            //}
         }
     }
 }
