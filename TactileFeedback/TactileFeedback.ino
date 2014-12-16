@@ -11,23 +11,12 @@
  *
  * 2. Functions: Contains all of the user created functions to help process
  *    the signals and control the robot.
- *    - Calibrate
- *    - MoveMotor
  *
- * 3. Main Loop: First asks the user to calibrate the flex sensors to their
- *    hand by opening and closing their hand to get the max and min range.
- *    Takes in sensor measurements from the flex sensors and calls the 
- *    function to filter out the signal and then use the filtered value for
- *    the sensor measurement to move the Servo motor position.
+ * 3. Main Loop: 
  * 
  *    *** TO DO ***
  *     - Optimize code for speed.
- *     - Look at making a generic program for righ and left hand control.
- *     - Documentand comment all code clearly.
- *     - Make a status function for the 3 LEDs. {?}
- *     - Make an LED variable array for easy status definitions.
- *     - Look at naming convention for readings. {?}
- *     - Add thumb sensor for gripping motion.
+ *     - Get pressure sensor readings.
  */
  
 //============================ Parameter Setup =============================
