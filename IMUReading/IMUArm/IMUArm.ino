@@ -5,7 +5,7 @@
 // I2Cdev and MPU6050 must be installed as libraries, or else the .cpp/.h files
 // for both classes must be in the include path of your project
 #include "I2Cdev.h"
-#include <Servo.h>
+//#include <Servo.h>
 
 #include "MPU6050_6Axis_MotionApps20.h"
 //#include "MPU6050.h" // not necessary if using MotionApps include file
@@ -29,11 +29,24 @@ Quaternion q;           // [w, x, y, z]         quaternion container
 float euler[3];         // [psi, theta, phi]    Euler angle container
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 float grav[3];
-Servo motor;
+float yawOffset = 0;
+
+const int pinOut = 11;
+const int pinIn = 13;
+int reset = 0;
+//Servo motorYaw;
+//Servo motorPitch;
+
+//Servo elbow;
+//Servo wrist;
+//Servo twist;
 
 void setup() {
     // Begin I2C communication
     Wire.begin();
+    pinMode(pinOut, OUTPUT);
+    pinMode(pinIn, INPUT);
+    digitalWrite(pinOut, HIGH);
 
     // Initialize serial communication
     Serial.begin(38400);
@@ -45,21 +58,21 @@ void setup() {
     // crystal solution for the UART timer.
 
     // initialize device
-    Serial.println(F("Initializing I2C devices..."));
+    //Serial.println(F("Initializing I2C devices..."));
     mpu.initialize();
 
     // verify connection
-    Serial.println(F("Testing device connections..."));
-    Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
+    //Serial.println(F("Testing device connections..."));
+    //Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
 
     // load and configure the DMP
-    Serial.println(F("Initializing DMP..."));
+    //Serial.println(F("Initializing DMP..."));
     devStatus = mpu.dmpInitialize();
     
     // make sure it worked (returns 0 if so)
     if (devStatus == 0) {
         // turn on the DMP, now that it's ready
-        Serial.println(F("Enabling DMP..."));
+        //Serial.println(F("Enabling DMP..."));
         mpu.setDMPEnabled(true);
 
         // set our DMP Ready flag so the main loop() function knows it's okay to use it
@@ -70,7 +83,14 @@ void setup() {
     } else {
         // ERROR!
     }
-    motor.attach(3);
+    //motorYaw.attach(10);
+    //motorPitch.attach(9);
+    //elbow.attach(6);
+    //wrist.attach(5);
+    //twist.attach(3);
+    //twist.write(105);
+    //elbow.write(150);
+    //wrist.write(30);
 }
 
 void loop() {
@@ -84,7 +104,7 @@ void loop() {
   fifoCount = mpu.getFIFOCount();
 
   // check for overflow (this should never happen unless our code is too inefficient)
-  if (fifoCount == 1024) {
+  if (fifoCount >= 1024) {
       // reset so we can continue cleanly
       mpu.resetFIFO();
   } 
@@ -112,14 +132,23 @@ void loop() {
   ypr[0] = atan2(2*q.x*q.y - 2*q.w*q.z, 2*q.w*q.w + 2*q.x*q.x - 1);
   ypr[1] = atan(grav[0] / sqrt(grav[1]*grav[1] + grav[2]*grav[2]));
   ypr[2] = atan(grav[1] / sqrt(grav[0]*grav[0] + grav[2]*grav[2]));
-    
+  
+  int buttonState = digitalRead(pinIn);
+  
+  if (buttonState == HIGH) {
+    yawOffset = ypr[0]* 180/M_PI;
+  }
+  
+  
+  float yaw = ypr[0]* 180/M_PI - yawOffset;
   //Serial.print("ypr\t");
   // Creates the communication protocol
   Serial.print("$");
-  Serial.print(ypr[0]* 180/M_PI);Serial.print("#");
-  Serial.print(ypr[1]* 180/M_PI);Serial.print("%");
-  Serial.print(ypr[2]* 180/M_PI);Serial.println("&");
+  Serial.print(constrain(map(yaw, -90, 90, 0, 180),0,180));Serial.print("#");
+  Serial.print(constrain(map(ypr[1]* 180/M_PI, -90, 90, 0, 180),0,180));Serial.print("%");
+  Serial.print(constrain(map(ypr[2]* 180/M_PI, -90, 90, -20, 160),0,180));Serial.println("&");
   
-    
-  motor.write(constrain(map((ypr[1]* 180/M_PI),-90,90,0,175),0,175));    
+  
+  //motorYaw.write(constrain(map((ypr[0]* 180/M_PI),-90,90,0,175),0,175));    
+  //motorPitch.write(constrain(map((ypr[1]* 180/M_PI),-90,90,0,175),0,175));    
 }

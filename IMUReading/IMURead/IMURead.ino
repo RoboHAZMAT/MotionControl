@@ -44,6 +44,7 @@
 // Arduino Wire library is required for the I2C communication
 #include <Wire.h>
 #include <I2Cdev.h>
+#include <Servo.h>
 
 // Libraries added to get IMU specific data
 #include "helper_3dmath.h"
@@ -104,24 +105,31 @@ float accCali[3] = {0,0,0};  // may have to add the -g
 float gyroCali[3] = {0,0,0};
 float magCali[3] = {0,0,0};
 
+Servo motorYaw;
+Servo motorPitch;
+
+Servo elbow;
+Servo wrist;
+Servo twist;
+
 void setup()
 {
   // Joins the I2C bus
   Wire.begin();
   
   // Initialize serial communication
-  Serial.begin(38400);
+  //Serial.begin(38400);
   
   // Initialize the IMU
-  Serial.println("Initializing IMU...");
+  //Serial.println("Initializing IMU...");
   IMU.initialize();
-  Serial.println("Initializing Magnetometer...");
+  //Serial.println("Initializing Magnetometer...");
   Mag.initialize();
   
   // Test connection to IMU
-  Serial.println("Testing connections...");
-  Serial.println(IMU.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
-  Serial.println(Mag.testConnection() ? "AK8975 connection successful" : "AK8975 connection failed");
+  //Serial.println("Testing connections...");
+  //Serial.println(IMU.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
+  //Serial.println(Mag.testConnection() ? "AK8975 connection successful" : "AK8975 connection failed");
   
   // Set up reading buffers to zeros
   for (int x = 0; x < 3; x++) {
@@ -132,11 +140,19 @@ void setup()
       gyroBufferKF[k][x] = 0;
     }  
   }
+  motorYaw.attach(10);
+  motorPitch.attach(9);
+  elbow.attach(6);
+  wrist.attach(5);
+  twist.attach(3);
+  twist.write(105);
+  elbow.write(150);
+  wrist.write(30);
 
   // Calibrates the IMU 
   boolean calibrated = false;
   while (!calibrated) {
-    Serial.println("Calibrating IMU Readings...");
+    //Serial.println("Calibrating IMU Readings...");
     calibrated = Calibrate();
   }
   timePrev = millis();
@@ -174,10 +190,10 @@ boolean Calibrate() {
       // magHist[x] += m[x];
     }
     if (k % 1000 == 0) {
-      Serial.print(k/1000);Serial.print("..."); 
+      //Serial.print(k/1000);Serial.print("..."); 
     }
   }
-  Serial.println("");
+  //Serial.println("");
   // Take the average of the readings to determine sensor offsets
   for (int x = 0; x < 3; x++) {
     // NOTE: gyro and mag mag not need cali stuff added maybe
@@ -185,7 +201,7 @@ boolean Calibrate() {
     gyroCali[x] += gyroHist[x] / caliReadings;
     //magCali[x] += magHist[x] / caliReadings;
   }
-  Serial.println("Done Calibrating.");
+  //Serial.println("Done Calibrating.");
   return true;
 }
 
@@ -365,9 +381,11 @@ void loop()
   
   // Kalman Filter on the IMU data
   KalmanFilter(dt);
+  motorYaw.write(gyroKF[2]);
+  motorPitch.write(gyroKF[1]+90);
   
   // Prints the calculated IMU data
-  printIMU();
+  //printIMU();
   
   // Increase the index variable, wrap around the filter constant
   i++;
