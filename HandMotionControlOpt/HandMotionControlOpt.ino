@@ -81,7 +81,7 @@ int readingBuffer[numSensors][numReadings];
  */
 void setup(){
   // Begins Serial communication
-  Serial.begin(9600);
+  //Serial.begin(9600);
   
   // Sets up the LEDs
   pinMode(greenLED, OUTPUT);
@@ -100,14 +100,14 @@ void setup(){
     motor[k].attach(k + 2);      
     
     // Set up of the min and max values
-    maxR[k] = 0;
-    minR[k] = 100000;
+    maxR[k] = 660;
+    minR[k] = 550;
     
     for (int j = 0; j < numReadings; j++) {
       readingBuffer[k][j] = 0;
     }
   }
-  delay(2000);
+  delay(1000);
   
   // Calibrates all of the flex sensor max and mins
   Calibrate(); 
@@ -124,16 +124,13 @@ void setup(){
 /**
  * Calibrates the flex sensors to find the max and min range for the user.
  */
-void Calibrate() {
-  // Red and yellow LED both on to notify user of calibration start
-  digitalWrite(yellowLED, HIGH);
-  digitalWrite(redLED, HIGH);
-  
+void Calibrate() {  
   // Delay to give user time
   delay(1000);
   
   // Red off so yellow is on signifying calibration ongoing
   digitalWrite(redLED, LOW);
+  digitalWrite(yellowLED, HIGH);
 
   // Takes 2500 measurements to make sure true values are found
   for (int j = 0; j < 2500; j++) {
@@ -196,7 +193,7 @@ void loop() {
   // and constrain them in the Servo motor degree range
   int reading[numSensors];
   for (int k = 0; k < numSensors; k++) {
-    reading[k] = constrain(map(analogRead(pin[k]),minR[k],maxR[k],0,175),0,175); 
+    reading[k] = constrain(map(analogRead(pin[k]),minR[k],maxR[k],175,0),0,175); 
     motorPos[k] = MoveMotor(i,reading[k],readingBuffer[k],motor[k],motorPos[k]); 
   }
   // Increase the index variable, wrap around the filter constant
