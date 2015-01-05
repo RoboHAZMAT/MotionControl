@@ -37,7 +37,7 @@ void setup() {
     digitalWrite(pinOut, HIGH);
 
     // Initialize serial communication
-    Serial.begin(38400);
+    Serial.begin(9600);
 
     // NOTE: 8MHz or slower host processors, like the Teensy @ 3.3v or Ardunio
     // Pro Mini running at 3.3v, cannot handle this baud rate reliably due to
