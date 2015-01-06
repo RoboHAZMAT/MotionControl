@@ -1,4 +1,3 @@
-#include <Servo.h>
 //========================== Hand Motion Control ===========================
 /* RoboHAZMAT Senior Design Team
  * Motion Control Group
@@ -33,6 +32,7 @@
  *     - Look at naming convention for readings. {?}
  *     - Add thumb sensor for gripping motion.
  */
+#include <Servo.h>
  
 //============================ Parameter Setup =============================
 /* Defines and initializes all of the necessary variables, Servos, sensor
