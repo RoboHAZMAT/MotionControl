@@ -54,9 +54,9 @@ void setup()
 //   rd[n] = 90;
 // }
   rd[0] = 90;
-  rd[1] = 130;
+  rd[1] = 90;
   rd[2] = 100;
-  rd[3] = 90;
+  rd[3] = 40;
   rd[4] = 90;
   rd[5] = 45;
  //initiate array at resting position in case comm does
