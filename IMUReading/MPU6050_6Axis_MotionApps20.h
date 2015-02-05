@@ -314,9 +314,9 @@ uint8_t MPU6050::dmpInitialize() {
 
     // get X/Y/Z gyro offsets
     DEBUG_PRINTLN(F("Reading gyro offset TC values..."));
-    int8_t xgOffsetTC = getXGyroOffsetTC();
-    int8_t ygOffsetTC = getYGyroOffsetTC();
-    int8_t zgOffsetTC = getZGyroOffsetTC();
+    int8_t xgOffsetTC = getXGyroOffset();
+    int8_t ygOffsetTC = getYGyroOffset();
+    int8_t zgOffsetTC = getZGyroOffset();
     DEBUG_PRINT(F("X gyro offset = "));
     DEBUG_PRINTLN(xgOffset);
     DEBUG_PRINT(F("Y gyro offset = "));
@@ -375,9 +375,9 @@ uint8_t MPU6050::dmpInitialize() {
             setOTPBankValid(false);
 
             DEBUG_PRINTLN(F("Setting X/Y/Z gyro offset TCs to previous values..."));
-            setXGyroOffsetTC(xgOffsetTC);
-            setYGyroOffsetTC(ygOffsetTC);
-            setZGyroOffsetTC(zgOffsetTC);
+            setXGyroOffset(xgOffsetTC);
+            setYGyroOffset(ygOffsetTC);
+            setZGyroOffset(zgOffsetTC);
 
             //DEBUG_PRINTLN(F("Setting X/Y/Z gyro user offsets to zero..."));
             //setXGyroOffset(0);
