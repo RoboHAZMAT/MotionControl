@@ -1,33 +1,31 @@
+// ########## Wireless Sensor Packet ##########
 /*
- Copyright (C) 2011 J. Coliz <maniacbug@ymail.com>
+This is a code originally constructed by J. Coliz (maniacbug) and modified
+by John Gardiner & Gerardo Bledt for the 2014-2015 Virginia Tech Mechanical
+Engineering Senior Design RoboHazMat Project.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
+Copyright (C) 2011 J. Coliz <maniacbug@ymail.com>
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+version 2 as published by the Free Software Foundation.
  */
 
+// #### Libraries ####
 #include <SPI.h>
 #include <EEPROM.h>
 #include "nRF24L01.h"
 #include "RF24.h"
 #include "printf.h"
 
-//
-// Hardware configuration
-//
-
+// #### Hardware configuration ####
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10
-
 RF24 radio(9,10);
 
 // sets the role of this unit in hardware.  Connect to GND to be the 'pong' receiver
 // Leave open to be the 'pong' receiver.
 const int role_pin = 7;
 
-//
-// Topology
-//
-
+// #### Topology ####
 // Radio pipe addresses for the nodes to communicate.  Only ping nodes need
 // dedicated pipes in this topology.  Each ping node has a talking pipe
 // that it will ping into, and a listening pipe that it will listen for
@@ -37,15 +35,11 @@ const int role_pin = 7;
 const uint64_t talking_pipes[5] = { 0xF0F0F0F0D2LL, 0xF0F0F0F0C3LL, 0xF0F0F0F0B4LL, 0xF0F0F0F0A5LL, 0xF0F0F0F096LL };
 const uint64_t listening_pipes[5] = { 0x3A3A3A3AD2LL, 0x3A3A3A3AC3LL, 0x3A3A3A3AB4LL, 0x3A3A3A3AA5LL, 0x3A3A3A3A96LL };
 
-//
-// Role management
-//
+// #### Role management ####
 // Set up role.  This sketch uses the same software for all the nodes
 // in this system.  Doing so greatly simplifies testing.  The hardware itself specifies
 // which node it is.
-//
 // This is done through the role_pin
-//
 
 // The various roles supported by this sketch
 typedef enum { role_invalid = 0, role_ping_out, role_pong_back } role_e;
@@ -56,9 +50,7 @@ const char* role_friendly_name[] = { "invalid", "Ping out", "Pong back"};
 // The role of the current running sketch
 role_e role;
 
-//
-// Address management
-//
+// #### Address management ####
 
 // Where in EEPROM is the address stored?
 const uint8_t address_at_eeprom_location = 0;
@@ -70,10 +62,7 @@ uint8_t node_address;
 
 void setup(void)
 {
-  //
-  // Role
-  //
-
+  // #### Role ####
   // set up the role pin
   pinMode(role_pin, INPUT);
   digitalWrite(role_pin,HIGH);
@@ -85,12 +74,9 @@ void setup(void)
   else
     role = role_pong_back;
 
-  //
-  // Address
-  //
-
+  // #### Address ####
   if ( role == role_pong_back )
-    node_address = 1;
+    node_address = 1; //reserved for the main receiver
   else
   {
     // Read the address from EEPROM
@@ -102,6 +88,7 @@ void setup(void)
       node_address = reading;
 
     // Otherwise, it is invalid, so set our address AND ROLE to 'invalid'
+    // This will persist until a role is assigned via the serial monitor.
     else
     {
       node_address = 0;
@@ -109,26 +96,17 @@ void setup(void)
     }
   }
 
-  //
-  // Print preamble
-  //
-
+  // #### Print preamble ####
   Serial.begin(57600);
   printf_begin();
   printf("\n\rRF24/examples/starping/\n\r");
   printf("ROLE: %s\n\r",role_friendly_name[role]);
   printf("ADDRESS: %i\n\r",node_address);
 
-  //
-  // Setup and configure rf radio
-  //
-
+  // #### Setup and configure rf radio ####
   radio.begin();
 
-  //
-  // Open pipes to other nodes for communication
-  //
-
+  // #### Open pipes to other nodes for communication ####
   // The pong node listens on all the ping node talking pipes
   // and sends the pong back on the sending node's specific listening pipe.
   if ( role == role_pong_back )
@@ -139,7 +117,6 @@ void setup(void)
     radio.openReadingPipe(4,talking_pipes[3]);
     radio.openReadingPipe(5,talking_pipes[4]);
   }
-
   // Each ping node has a talking pipe that it will ping into, and a listening
   // pipe that it will listen for the pong.
   if ( role == role_ping_out )
@@ -150,22 +127,13 @@ void setup(void)
     radio.openReadingPipe(1,listening_pipes[node_address-2]);
   }
 
-  //
-  // Start listening
-  //
-
+  // #### Start listening ####
   radio.startListening();
-
-  //
-  // Dump the configuration of the rf unit for debugging
-  //
-
+  
+  // #### Dump the configuration of the rf unit for debugging ####
   radio.printDetails();
 
-  //
-  // Prompt the user to assign a node address if we don't have one
-  //
-
+  // #### Prompt the user to assign a node address if we don't have one ####
   if ( role == role_invalid )
   {
     printf("\n\r*** NO NODE ADDRESS ASSIGNED *** Send 1 through 6 to assign an address\n\r");
@@ -174,10 +142,7 @@ void setup(void)
 
 void loop(void)
 {
-  //
-  // Ping out role.  Repeatedly send the current time
-  //
-
+  // #### Ping out role.  Repeatedly send the current time ####
   if (role == role_ping_out)
   {
     // First, stop listening so we can talk.
@@ -217,9 +182,7 @@ void loop(void)
     delay(1000);
   }
 
-  //
-  // Pong back role.  Receive each packet, dump it out, and send it back
-  //
+  // #### Pong back role.  Receive each packet, dump it out, and send it back ####
 
   if ( role == role_pong_back )
   {
@@ -257,9 +220,7 @@ void loop(void)
     }
   }
 
-  //
-  // Listen for serial input, which is how we set the address
-  //
+  // #### Listen for serial input, which is how we set the address ####
   if (Serial.available())
   {
     // If the character on serial input is in a valid range...
@@ -275,4 +236,5 @@ void loop(void)
     }
   }
 }
+
 // vim:ai:ci sts=2 sw=2 ft=cpp
