@@ -11,6 +11,7 @@ In an effort to alleviate cumbersome wires, we are attempting to use the Nordic 
 * [Button] (https://www.sparkfun.com/products/97)
 * [LEDs] (http://www.opel.ece.vt.edu/reference/DataSheets/08LCHR10-LED.pdf)
 * [Perfboard] (http://www.dx.com/p/electrical-bakelite-circuit-board-5x7cm-10-piece-132480#.VOuZ5_nF_qs)
+* [Switch] (http://www.elexp.com/ProductDetails.aspx?item_no=17SLDH251&CatId=36e69afb-3c1f-4322-9ac3-6e126246b7ae)
 
 #####Variations
 There will be two different sensor packets that only vary slightly. Cases are being designed to be 3D printed for each packet set. The packet mounted on the wrist will handle the flex sensor used for actuating the gripper of the robot. This sensors packet will also include 3-4 LEDs. The sensor packet mounted on the bicep of the operator will only have 1-2 LEDs and no flex sensor.
