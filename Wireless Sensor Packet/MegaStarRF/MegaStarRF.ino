@@ -60,6 +60,42 @@ const uint8_t address_at_eeprom_location = 0;
 // 1, and the rest are 2-6
 uint8_t node_address;
 
+// #### Structures ####
+// In the future, verification characters need to be added to ensure
+// that, even with packet loss, the right numbers are being sent to 
+// the right channels.
+
+// Wireless Packet Structure - quaternion and flex sensor
+// Since the biceps do not have flex sensors, the will send a 
+// specified null value
+typedef struct{
+  int N;
+  float W;// quaternion begin
+  float X;
+  float Y;
+  float Z;// quaternion end
+  float F;// Flex sensor
+  int reset;
+  int T;
+}
+A_t;
+
+//// Bicep packet Structure - quaternion
+//typedef struct{
+//  float W;
+//  float X;
+//  float Y;
+//  float Z;
+//}
+//B_t;
+
+//variable declarations
+A_t wirelesspacket;
+//A_t rightwrist;
+//A_t leftwrist;
+//A_t rightbicep;
+//A_t leftbicep;
+
 void setup(void)
 {
   // #### Role ####
@@ -105,6 +141,8 @@ void setup(void)
 
   // #### Setup and configure rf radio ####
   radio.begin();
+  radio.setDataRate(RF24_2MBPS); // Both endpoints must have this set the same
+  radio.setAutoAck(false);       // Either endpoint can set to false to disable ACKs
 
   // #### Open pipes to other nodes for communication ####
   // The pong node listens on all the ping node talking pipes
@@ -142,7 +180,7 @@ void setup(void)
 
 void loop(void)
 {
-  // #### Ping out role.  Repeatedly send the current time ####
+  // #### Ping out role.  Repeatedly send the current time #### SENDER
   if (role == role_ping_out)
   {
     // First, stop listening so we can talk.
@@ -182,26 +220,34 @@ void loop(void)
     delay(1000);
   }
 
-  // #### Pong back role.  Receive each packet, dump it out, and send it back ####
-
+  // #### Pong back role.  Receive each packet, dump it out, and send it back #### RECEIEVER
   if ( role == role_pong_back )
   {
     // if there is data ready
-    uint8_t pipe_num;
+    uint8_t pipe_num; //pipe number variable
     if ( radio.available(&pipe_num) )
     {
+      //Serial.print(pipe_num);
       // Dump the payloads until we've gotten everything
-      unsigned long got_time;
       bool done = false;
-      while (!done)
-      {
-        // Fetch the payload, and see if this was the last one.
-        done = radio.read( &got_time, sizeof(unsigned long) );
-
-        // Spew it
-        printf("Got payload %lu from node %i...",got_time,pipe_num+1);
-      }
-
+        while (!done)
+        {
+          // Fetch the payload, and see if this was the last one.
+          done = radio.read( &wirelesspacket, sizeof(wirelesspacket) );
+        }
+        
+      // Spew it
+      //printf("Got payload %lu from node %i...",got_time,pipe_num+1);
+      Serial.print(wirelesspacket.T);Serial.print("*");
+      Serial.print(wirelesspacket.N);Serial.print("$");
+      Serial.print(wirelesspacket.W);Serial.print("#");
+      Serial.print(wirelesspacket.X);Serial.print("%");
+      Serial.print(wirelesspacket.Y);Serial.print("&");
+      Serial.print(wirelesspacket.Z);Serial.print("@");
+      Serial.print(wirelesspacket.reset);Serial.println("!");
+          
+          
+      /* Temporarily disabling this case of visible acknowledgment signal
       // First, stop listening so we can talk
       radio.stopListening();
 
@@ -217,9 +263,11 @@ void loop(void)
 
       // Now, resume listening so we catch the next packets.
       radio.startListening();
+      */
     }
   }
 
+/* This section will probably not be needed for the receiver
   // #### Listen for serial input, which is how we set the address ####
   if (Serial.available())
   {
@@ -235,6 +283,7 @@ void loop(void)
       while(1) ;
     }
   }
+  */ 
 }
 
 // vim:ai:ci sts=2 sw=2 ft=cpp

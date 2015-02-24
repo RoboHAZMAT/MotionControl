@@ -60,6 +60,29 @@ const uint8_t address_at_eeprom_location = 0;
 // 1, and the rest are 2-6
 uint8_t node_address;
 
+// #### Structures ####
+// In the future, verification characters need to be added to ensure
+// that, even with packet loss, the right numbers are being sent to 
+// the right channels.
+
+// Wireless Packet Structure - quaternion and flex sensor
+// Since the biceps do not have flex sensors, the will send a 
+// specified null value
+typedef struct{
+  int N;
+  float W;// quaternion begin
+  float X;
+  float Y;
+  float Z;// quaternion end
+  float F;// Flex sensor
+  int reset;
+}
+A_t;
+
+//variable declarations
+A_t wirelesspacket;
+
+
 void setup(void)
 {
   // #### Role ####
@@ -105,6 +128,8 @@ void setup(void)
 
   // #### Setup and configure rf radio ####
   radio.begin();
+  radio.setDataRate(RF24_2MBPS); // Both endpoints must have this set the same
+  radio.setAutoAck(false);       // Either endpoint can set to false to disable ACKs
 
   // #### Open pipes to other nodes for communication ####
   // The pong node listens on all the ping node talking pipes
@@ -138,6 +163,14 @@ void setup(void)
   {
     printf("\n\r*** NO NODE ADDRESS ASSIGNED *** Send 1 through 6 to assign an address\n\r");
   }
+  
+  //for debug
+  wirelesspacket.W = 0;
+  wirelesspacket.X = 0;
+  wirelesspacket.Y = 0;
+  wirelesspacket.Z = 0;
+  wirelesspacket.F = 0;
+  wirelesspacket.reset = 0;
 }
 
 void loop(void)
@@ -149,13 +182,23 @@ void loop(void)
     radio.stopListening();
 
     // Take the time, and send it.  This will block until complete
-    unsigned long time = millis();
-    printf("Now sending %lu...",time);
-    radio.write( &time, sizeof(unsigned long) );
+    //unsigned long time = millis();
+    //printf("Now sending %lu...",time);
+    
+    //for debug
+    wirelesspacket.N = node_address;
+    wirelesspacket.W = wirelesspacket.W + 0.1;
+    wirelesspacket.X = wirelesspacket.X + 0.2;
+    wirelesspacket.Y = wirelesspacket.Y + 0.3;
+    wirelesspacket.Z = wirelesspacket.Z + 0.4;
+    wirelesspacket.F = wirelesspacket.F + 0.5;
+    
+    radio.write( &wirelesspacket, sizeof(wirelesspacket) );
 
     // Now, continue listening
     radio.startListening();
 
+    /* Disabled for the time being. May include later on.
     // Wait here until we get a response, or timeout (250ms)
     unsigned long started_waiting_at = millis();
     bool timeout = false;
@@ -179,7 +222,8 @@ void loop(void)
     }
 
     // Try again 1s later
-    delay(1000);
+    delay(1000); //so lonnnnng
+    */
   }
 
   // #### Pong back role.  Receive each packet, dump it out, and send it back ####
