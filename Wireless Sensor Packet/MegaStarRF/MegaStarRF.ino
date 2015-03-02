@@ -238,8 +238,9 @@ void loop(void)
         
       // Spew it
       //printf("Got payload %lu from node %i...",got_time,pipe_num+1);
-      Serial.print(wirelesspacket.T);Serial.print("*");
-      Serial.print(wirelesspacket.N);Serial.print("$");
+      //Serial.print(wirelesspacket.T);Serial.print("*");
+      //Serial.print(wirelesspacket.N);
+      Serial.print("$");
       Serial.print(wirelesspacket.W);Serial.print("#");
       Serial.print(wirelesspacket.X);Serial.print("%");
       Serial.print(wirelesspacket.Y);Serial.print("&");
