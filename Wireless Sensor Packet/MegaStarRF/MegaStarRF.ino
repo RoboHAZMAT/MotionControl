@@ -1,290 +1,286 @@
 // ########## Wireless Sensor Packet ##########
 /*
-This is a code originally constructed by J. Coliz (maniacbug) and modified
-by John Gardiner & Gerardo Bledt for the 2014-2015 Virginia Tech Mechanical
+John Gardiner & Gerardo Bledt for the 2014-2015 Virginia Tech Mechanical
 Engineering Senior Design RoboHazMat Project.
-
-Copyright (C) 2011 J. Coliz <maniacbug@ymail.com>
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
  */
 
 // #### Libraries ####
 #include <SPI.h>
-#include <EEPROM.h>
 #include "nRF24L01.h"
 #include "RF24.h"
 #include "printf.h"
 
-// #### Hardware configuration ####
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 53 (normally 9 & 10 on regualr Arduinos)
 RF24 radio(9,53);
 
-// sets the role of this unit in hardware.  Connect to GND to be the 'pong' receiver
-// Leave open to be the 'pong' receiver.
-const int role_pin = 7;
-
-// #### Topology ####
-// Radio pipe addresses for the nodes to communicate.  Only ping nodes need
-// dedicated pipes in this topology.  Each ping node has a talking pipe
-// that it will ping into, and a listening pipe that it will listen for
-// the pong.  The pong node listens on all the ping node talking pipes
-// and sends the pong back on the sending node's specific listening pipe.
-
+//comm pipes
 const uint64_t talking_pipes[5] = { 0xF0F0F0F0D2LL, 0xF0F0F0F0C3LL, 0xF0F0F0F0B4LL, 0xF0F0F0F0A5LL, 0xF0F0F0F096LL };
 const uint64_t listening_pipes[5] = { 0x3A3A3A3AD2LL, 0x3A3A3A3AC3LL, 0x3A3A3A3AB4LL, 0x3A3A3A3AA5LL, 0x3A3A3A3A96LL };
-
-// #### Role management ####
-// Set up role.  This sketch uses the same software for all the nodes
-// in this system.  Doing so greatly simplifies testing.  The hardware itself specifies
-// which node it is.
-// This is done through the role_pin
-
-// The various roles supported by this sketch
-typedef enum { role_invalid = 0, role_ping_out, role_pong_back } role_e;
-
-// The debug-friendly names of those roles
-const char* role_friendly_name[] = { "invalid", "Ping out", "Pong back"};
-
-// The role of the current running sketch
-role_e role;
-
-// #### Address management ####
-
-// Where in EEPROM is the address stored?
-const uint8_t address_at_eeprom_location = 0;
-
-// What is our address (SRAM cache of the address from EEPROM)
-// Note that zero is an INVALID address.  The pong back unit takes address
-// 1, and the rest are 2-6
-uint8_t node_address;
-
-// #### Structures ####
-// In the future, verification characters need to be added to ensure
-// that, even with packet loss, the right numbers are being sent to 
-// the right channels.
 
 // Wireless Packet Structure - quaternion and flex sensor
 // Since the biceps do not have flex sensors, the will send a 
 // specified null value
 typedef struct{
-  int N;
+  int N; //Packet ID
   float W;// quaternion begin
   float X;
   float Y;
   float Z;// quaternion end
   float F;// Flex sensor
-  int reset;
-  int T;
+  int reset; //reset button depressed
+  int T; //Time
 }
 A_t;
+A_t wirelesspacket,P2,P3,P4,P5,P6; //Instantiate packets. 
 
-//// Bicep packet Structure - quaternion
-//typedef struct{
-//  float W;
-//  float X;
-//  float Y;
-//  float Z;
-//}
-//B_t;
+//array holding the bools of system and wsp's indicating whether or not they
+//are ready to be read.
+bool idready [6] = {false, false, false, false, false, false};
+//idready -> {whole system, id2, id3, id4, id5, id6} description of vars
 
-//variable declarations
-A_t wirelesspacket;
-//A_t rightwrist;
-//A_t leftwrist;
-//A_t rightbicep;
-//A_t leftbicep;
+//the array indicating what systems need to be initialized in order for readings
+//to start being sent to matlab. Set the id's that you are using as true. All 
+//should be true when using the full system.
+bool readyconfig [6] = {true, true, true, false, false, false};
 
 void setup(void)
 {
-  // #### Role ####
-  // set up the role pin
-  pinMode(role_pin, INPUT);
-  digitalWrite(role_pin,HIGH);
-  delay(20); // Just to get a solid reading on the role pin
-
-  // read the address pin, establish our role
-  if ( digitalRead(role_pin) )
-    role = role_ping_out;
-  else
-    role = role_pong_back;
-
-  // #### Address ####
-  if ( role == role_pong_back )
-    node_address = 1; //reserved for the main receiver
-  else
-  {
-    // Read the address from EEPROM
-    uint8_t reading = EEPROM.read(address_at_eeprom_location);
-
-    // If it is in a valid range for node addresses, it is our
-    // address.
-    if ( reading >= 2 && reading <= 6 )
-      node_address = reading;
-
-    // Otherwise, it is invalid, so set our address AND ROLE to 'invalid'
-    // This will persist until a role is assigned via the serial monitor.
-    else
-    {
-      node_address = 0;
-      role = role_invalid;
-    }
-  }
-
-  // #### Print preamble ####
-  Serial.begin(57600);
+  // Print preamble
+  Serial.begin(115200);
+  Serial.print("This is the wireless receiver.");
   printf_begin();
-  printf("\n\rRF24/examples/starping/\n\r");
-  printf("ROLE: %s\n\r",role_friendly_name[role]);
-  printf("ADDRESS: %i\n\r",node_address);
 
-  // #### Setup and configure rf radio ####
+  // Setup and configure rf radio
   radio.begin();
   radio.setDataRate(RF24_2MBPS); // Both endpoints must have this set the same
-  radio.setAutoAck(false);       // Either endpoint can set to false to disable ACKs
+  radio.setAutoAck(true);       // Either endpoint can set to false to disable ACKs
 
-  // #### Open pipes to other nodes for communication ####
+  // Open pipes to other nodes for communication 
   // The pong node listens on all the ping node talking pipes
-  // and sends the pong back on the sending node's specific listening pipe.
-  if ( role == role_pong_back )
-  {
-    radio.openReadingPipe(1,talking_pipes[0]);
-    radio.openReadingPipe(2,talking_pipes[1]);
-    radio.openReadingPipe(3,talking_pipes[2]);
-    radio.openReadingPipe(4,talking_pipes[3]);
-    radio.openReadingPipe(5,talking_pipes[4]);
-  }
-  // Each ping node has a talking pipe that it will ping into, and a listening
-  // pipe that it will listen for the pong.
-  if ( role == role_ping_out )
-  {
-    // Write on our talking pipe
-    radio.openWritingPipe(talking_pipes[node_address-2]);
-    // Listen on our listening pipe
-    radio.openReadingPipe(1,listening_pipes[node_address-2]);
-  }
+  radio.openReadingPipe(1,talking_pipes[0]);
+  radio.openReadingPipe(2,talking_pipes[1]);
+  radio.openReadingPipe(3,talking_pipes[2]);
+  radio.openReadingPipe(4,talking_pipes[3]);
+  radio.openReadingPipe(5,talking_pipes[4]);
 
-  // #### Start listening ####
+  //Start listening
   radio.startListening();
   
-  // #### Dump the configuration of the rf unit for debugging ####
+  //Dump the configuration of the rf unit for debugging
   radio.printDetails();
-
-  // #### Prompt the user to assign a node address if we don't have one ####
-  if ( role == role_invalid )
-  {
-    printf("\n\r*** NO NODE ADDRESS ASSIGNED *** Send 1 through 6 to assign an address\n\r");
-  }
+  
+  //debug initiate
+  wirelesspacket.N = 0;
+  wirelesspacket.W = 1;
+  wirelesspacket.X = 2;
+  wirelesspacket.Y = 3;
+  wirelesspacket.Z = 4;
+  wirelesspacket.F = 5;
+  wirelesspacket.reset = 0;
+  wirelesspacket.T = 60;
+  
 }
 
 void loop(void)
 {
-  // #### Ping out role.  Repeatedly send the current time #### SENDER
-  if (role == role_ping_out)
+
+  // if there is data ready
+  uint8_t pipe_num; //pipe number variable
+  if ( radio.available(&pipe_num) )
   {
-    // First, stop listening so we can talk.
-    radio.stopListening();
-
-    // Take the time, and send it.  This will block until complete
-    unsigned long time = millis();
-    printf("Now sending %lu...",time);
-    radio.write( &time, sizeof(unsigned long) );
-
-    // Now, continue listening
-    radio.startListening();
-
-    // Wait here until we get a response, or timeout (250ms)
-    unsigned long started_waiting_at = millis();
-    bool timeout = false;
-    while ( ! radio.available() && ! timeout )
-      if (millis() - started_waiting_at > 250 )
-        timeout = true;
-
-    // Describe the results
-    if ( timeout )
-    {
-      printf("Failed, response timed out.\n\r");
+    //Serial.print(pipe_num);
+    // Dump the payloads until we've gotten everything
+    bool done = false;
+      while (!done)
+      {
+        // Fetch the payload, and see if this was the last one.
+        done = radio.read( &wirelesspacket, sizeof(wirelesspacket) );
+      }
+   
+    switch (wirelesspacket.N) {
+    case 0:
+      Serial.print("What the hell, this packet shouldn't have been sent");
+      break;
+    case 1:
+      Serial.print("ID 1 is supposed to be the receiver. Something's wrong.");
+      break;
+    case 2:
+      P2.N = wirelesspacket.N;
+      P2.W = wirelesspacket.W;
+      P2.X = wirelesspacket.X;
+      P2.Y = wirelesspacket.Y;
+      P2.Z = wirelesspacket.Z;
+      P2.F = wirelesspacket.F;
+      P2.reset = wirelesspacket.reset;
+      P2.T = wirelesspacket.T;
+      if (!idready[0] && !idready[1]){UpdateSystemStatus(2);}
+      break;
+    case 3:
+      P3.N = wirelesspacket.N;
+      P3.W = wirelesspacket.W;
+      P3.X = wirelesspacket.X;
+      P3.Y = wirelesspacket.Y;
+      P3.Z = wirelesspacket.Z;
+      P3.F = wirelesspacket.F;
+      P3.reset = wirelesspacket.reset;
+      P3.T = wirelesspacket.T;
+      if (!idready[0] && !idready[2]){UpdateSystemStatus(3);}
+      break;
+    case 4:
+      P4.N = wirelesspacket.N;
+      P4.W = wirelesspacket.W;
+      P4.X = wirelesspacket.X;
+      P4.Y = wirelesspacket.Y;
+      P4.Z = wirelesspacket.Z;
+      P4.F = wirelesspacket.F;
+      P4.reset = wirelesspacket.reset;
+      P4.T = wirelesspacket.T;
+      if (!idready[0] && !idready[3]){UpdateSystemStatus(4);}
+      break;
+    case 5:
+      P5.N = wirelesspacket.N;
+      P5.W = wirelesspacket.W;
+      P5.X = wirelesspacket.X;
+      P5.Y = wirelesspacket.Y;
+      P5.Z = wirelesspacket.Z;
+      P5.F = wirelesspacket.F;
+      P5.reset = wirelesspacket.reset;
+      P5.T = wirelesspacket.T;
+      if (!idready[0] && !idready[4]){UpdateSystemStatus(5);}
+      break;
+    case 6:
+      P6.N = wirelesspacket.N;
+      P6.W = wirelesspacket.W;
+      P6.X = wirelesspacket.X;
+      P6.Y = wirelesspacket.Y;
+      P6.Z = wirelesspacket.Z;
+      P6.F = wirelesspacket.F;
+      P6.reset = wirelesspacket.reset;
+      P6.T = wirelesspacket.T;
+      if (!idready[0] && !idready[5]){UpdateSystemStatus(6);}
+      break;
     }
-    else
-    {
-      // Grab the response, compare, and send to debugging spew
-      unsigned long got_time;
-      radio.read( &got_time, sizeof(unsigned long) );
-
-      // Spew it
-      printf("Got response %lu, round-trip delay: %lu\n\r",got_time,millis()-got_time);
-    }
-
-    // Try again 1s later
-    delay(1000);
+      
   }
-
-  // #### Pong back role.  Receive each packet, dump it out, and send it back #### RECEIEVER
-  if ( role == role_pong_back )
-  {
-    // if there is data ready
-    uint8_t pipe_num; //pipe number variable
-    if ( radio.available(&pipe_num) )
-    {
-      //Serial.print(pipe_num);
-      // Dump the payloads until we've gotten everything
-      bool done = false;
-        while (!done)
-        {
-          // Fetch the payload, and see if this was the last one.
-          done = radio.read( &wirelesspacket, sizeof(wirelesspacket) );
-        }
-        
-      // Spew it
-      //printf("Got payload %lu from node %i...",got_time,pipe_num+1);
-      //Serial.print(wirelesspacket.T);Serial.print("*");
-      //Serial.print(wirelesspacket.N);
-      Serial.print("$");
-      Serial.print(wirelesspacket.W);Serial.print("#");
-      Serial.print(wirelesspacket.X);Serial.print("%");
-      Serial.print(wirelesspacket.Y);Serial.print("&");
-      Serial.print(wirelesspacket.Z);Serial.print("@");
-      Serial.print(wirelesspacket.reset);Serial.println("!");
-          
-          
-      /* Temporarily disabling this case of visible acknowledgment signal
-      // First, stop listening so we can talk
-      radio.stopListening();
-
-      // Open the correct pipe for writing
-      radio.openWritingPipe(listening_pipes[pipe_num-1]);
-
-      // Retain the low 2 bytes to identify the pipe for the spew
-      uint16_t pipe_id = listening_pipes[pipe_num-1] & 0xffff;
-
-      // Send the final one back.
-      radio.write( &got_time, sizeof(unsigned long) );
-      printf("Sent response to %04x.\n\r",pipe_id);
-
-      // Now, resume listening so we catch the next packets.
-      radio.startListening();
-      */
-    }
-  }
-
-/* This section will probably not be needed for the receiver
-  // #### Listen for serial input, which is how we set the address ####
   if (Serial.available())
   {
-    // If the character on serial input is in a valid range...
-    char c = Serial.read();
-    if ( c >= '1' && c <= '6' )
-    {
-      // It is our address
-      EEPROM.write(address_at_eeprom_location,c-'0');
-
-      // And we are done right now (no easy way to soft reset)
-      printf("\n\rManually reset address to: %c\n\rPress RESET to continue!",c);
-      while(1) ;
+    int id = Serial.read();
+    if (idready[0]){
+    SendPacketInfo(id);
     }
+    else {Serial.println("System not ready!");}
   }
-  */ 
+  
 }
 
-// vim:ai:ci sts=2 sw=2 ft=cpp
+void SendPacketInfo(int packetid)
+{
+  switch (packetid)
+  {
+    case 1:
+    Serial.print("*");Serial.print(wirelesspacket.N);
+    Serial.print("^");Serial.print(wirelesspacket.F);
+    Serial.print("$");
+    Serial.print(wirelesspacket.W);Serial.print("#");
+    Serial.print(wirelesspacket.X);Serial.print("%");
+    Serial.print(wirelesspacket.Y);Serial.print("&");
+    Serial.print(wirelesspacket.Z);Serial.print("@");
+    Serial.print(wirelesspacket.reset);Serial.println("!");
+    break;
+    
+    case 2:
+    Serial.print("*");Serial.print(P2.N);
+    Serial.print("^");Serial.print(P2.F);
+    Serial.print("$");
+    Serial.print(P2.W);Serial.print("#");
+    Serial.print(P2.X);Serial.print("%");
+    Serial.print(P2.Y);Serial.print("&");
+    Serial.print(P2.Z);Serial.print("@");
+    Serial.print(P2.reset);Serial.println("!");
+    break;
+    
+    case 3:
+    Serial.print("*");Serial.print(P3.N);
+    Serial.print("^");Serial.print(P3.F);
+    Serial.print("$");
+    Serial.print(P3.W);Serial.print("#");
+    Serial.print(P3.X);Serial.print("%");
+    Serial.print(P3.Y);Serial.print("&");
+    Serial.print(P3.Z);Serial.print("@");
+    Serial.print(P3.reset);Serial.println("!");
+    break;
+    
+    case 4:
+    Serial.print("*");Serial.print(P4.N);
+    Serial.print("^");Serial.print(P4.F);
+    Serial.print("$");
+    Serial.print(P4.W);Serial.print("#");
+    Serial.print(P4.X);Serial.print("%");
+    Serial.print(P4.Y);Serial.print("&");
+    Serial.print(P4.Z);Serial.print("@");
+    Serial.print(P4.reset);Serial.println("!");
+    break;
+    
+    case 5:
+    Serial.print("*");Serial.print(P5.N);
+    Serial.print("^");Serial.print(P5.F);
+    Serial.print("$");
+    Serial.print(P5.W);Serial.print("#");
+    Serial.print(P5.X);Serial.print("%");
+    Serial.print(P5.Y);Serial.print("&");
+    Serial.print(P5.Z);Serial.print("@");
+    Serial.print(P5.reset);Serial.println("!");
+    break;
+    
+    case 6:
+    Serial.print("*");Serial.print(P6.N);
+    Serial.print("^");Serial.print(P6.F);
+    Serial.print("$");
+    Serial.print(P6.W);Serial.print("#");
+    Serial.print(P6.X);Serial.print("%");
+    Serial.print(P6.Y);Serial.print("&");
+    Serial.print(P6.Z);Serial.print("@");
+    Serial.print(P6.reset);Serial.println("!");
+    break;
+  }
+}
+
+void UpdateSystemStatus(int idcheck)
+{
+  //updates the idready array. If all imu's are ready, the system is set to ready
+  //and a confirmation is sent to the computer.
+  switch (idcheck){
+    case 2:
+    if (P2.W == 1 && P2.X == 2 && P2.Y == 3 && P2.Z == 4 && P2.F == 5)
+    {idready[1] = true;}
+    break;
+    
+    case 3:
+    if (P3.W == 1 && P3.X == 2 && P3.Y == 3 && P3.Z == 4 && P3.F == 5)
+    {idready[2] = true;}
+    break;
+    
+    case 4:
+    if (P4.W == 1 && P4.X == 2 && P4.Y == 3 && P4.Z == 4 && P4.F == 5)
+    {idready[3] = true;}
+    break;
+    
+    case 5:
+    if (P5.W == 1 && P5.X == 2 && P5.Y == 3 && P5.Z == 4 && P5.F == 5)
+    {idready[4] = true;}
+    break;
+    
+    case 6:
+    if (P6.W == 1 && P6.X == 2 && P6.Y == 3 && P6.Z == 4 && P6.F == 5)
+    {idready[5] = true;}
+    break;
+  }
+  
+  //Checks if the IMU's are all set up according to the setup conditions
+  //If everything is correct, the systemready variable is set to true.
+  if (idready[1] == readyconfig[1] && idready[2] == readyconfig[2] &&
+      idready[3] == readyconfig[3] && idready[4] == readyconfig[4] &&
+      idready[5] == readyconfig[5]) {idready[0] = true;}
+  Serial.println("System is ready");
+  
+}
