@@ -1,4 +1,4 @@
-// ########## Wireless Sensor Packet ##########
+  // ########## Wireless Sensor Packet ##########
 /*
 John Gardiner & Gerardo Bledt for the 2014-2015 Virginia Tech Mechanical
 Engineering Senior Design RoboHazMat Project.
@@ -70,7 +70,7 @@ Quaternion q;           // [w, x, y, z]
 
 // Reset button pins
 const int pinOut = 1; //JRG - Had to change to 1 & 2, 11&13 used by SPI
-const int pinIn = 2;
+const int pinIn = 5;
 
 // MPU control / status variables
 bool dmpReady = false;  // set true if DMP init was successful
@@ -83,6 +83,11 @@ uint8_t fifoBuffer[64]; // FIFO storage buffer
 
 void setup(void)
 {
+  // LEDs
+  pinMode(6, OUTPUT); //Red
+  pinMode(7, OUTPUT); //Green
+  pinMode(8, OUTPUT); //Blue
+
   // Wireless Setup //
   // Read the address from EEPROM
     uint8_t reading = EEPROM.read(address_at_eeprom_location);
@@ -136,10 +141,15 @@ void setup(void)
   // Initialize IMU
   Serial.println(F("Initializing I2C devices..."));
   mpu.initialize();
+  digitalWrite(6, HIGH);
 
   // Load and configure the DMP
   Serial.println(F("Initializing DMP..."));
   devStatus = mpu.dmpInitialize();
+  digitalWrite(6, LOW);
+  delay(10);
+  //digitalWrite(8, HIGH);
+  analogWrite(8,220);
   
   // Make sure it worked (returns 0 if so)
   if (devStatus == 0) {
@@ -159,6 +169,11 @@ void setup(void)
   } else {
       // ERROR!
   }
+  //digitalWrite(8, LOW);
+  analogWrite(8,0);
+  delay(10);
+  //digitalWrite(7, HIGH);
+  analogWrite(7,150);
 
 }
 
@@ -211,7 +226,7 @@ void loop(void)
     wirelesspacket.X = q.x;
     wirelesspacket.Y = q.y;
     wirelesspacket.Z = q.z;
-    wirelesspacket.F = wirelesspacket.F + 0.5; //Will be changed to analog read
+    wirelesspacket.F = 0; //Will be changed to analog read
     wirelesspacket.T = millis();
     
     //Send the data packet

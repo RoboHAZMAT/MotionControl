@@ -9,9 +9,10 @@ Engineering Senior Design RoboHazMat Project.
 #include "nRF24L01.h"
 #include "RF24.h"
 #include "printf.h"
+#include "ctype.h"
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 53 (normally 9 & 10 on regualr Arduinos)
-RF24 radio(9,53);
+RF24 radio(53,48);
 
 //comm pipes
 const uint64_t talking_pipes[5] = { 0xF0F0F0F0D2LL, 0xF0F0F0F0C3LL, 0xF0F0F0F0B4LL, 0xF0F0F0F0A5LL, 0xF0F0F0F096LL };
@@ -41,13 +42,13 @@ bool idready [6] = {false, false, false, false, false, false};
 //the array indicating what systems need to be initialized in order for readings
 //to start being sent to matlab. Set the id's that you are using as true. All 
 //should be true when using the full system.
-bool readyconfig [6] = {true, true, true, false, false, false};
+bool readyconfig [6] = {true, true, false, false, false, false};
 
 void setup(void)
 {
   // Print preamble
-  Serial.begin(115200);
-  Serial.print("This is the wireless receiver.");
+  Serial.begin(9600);
+  Serial.println("This is the wireless receiver.");
   printf_begin();
 
   // Setup and configure rf radio
@@ -113,6 +114,8 @@ void loop(void)
       P2.F = wirelesspacket.F;
       P2.reset = wirelesspacket.reset;
       P2.T = wirelesspacket.T;
+      //SendPacketInfo(2);
+      //Serial.println(idready[0]); Serial.println(idready[1]);
       if (!idready[0] && !idready[1]){UpdateSystemStatus(2);}
       break;
     case 3:
@@ -162,13 +165,20 @@ void loop(void)
     }
       
   }
-  if (Serial.available())
+  
+  if (Serial.available()>0)
   {
-    int id = Serial.read();
+    char theid = Serial.read();
+    String stheid(theid);
+    int id = 0;
+    id = stheid.toInt();
     if (idready[0]){
+    //Serial.println(id);
+    //Serial.println("Sending things your way");
     SendPacketInfo(id);
     }
     else {Serial.println("System not ready!");}
+    delay(10);
   }
   
 }
@@ -189,6 +199,7 @@ void SendPacketInfo(int packetid)
     break;
     
     case 2:
+    //Serial.println("Here comes packet two");
     Serial.print("*");Serial.print(P2.N);
     Serial.print("^");Serial.print(P2.F);
     Serial.print("$");
@@ -251,12 +262,13 @@ void UpdateSystemStatus(int idcheck)
   //and a confirmation is sent to the computer.
   switch (idcheck){
     case 2:
-    if (P2.W == 1 && P2.X == 2 && P2.Y == 3 && P2.Z == 4 && P2.F == 5)
-    {idready[1] = true;}
+    //Serial.println("We in");
+    if (P2.W == 1.00 && P2.X == 2.00 && P2.Y == 3.00 && P2.Z == 4.00 && P2.F == 5.00)
+    {idready[1] = true;} //Serial.println("Set to True");}
     break;
     
     case 3:
-    if (P3.W == 1 && P3.X == 2 && P3.Y == 3 && P3.Z == 4 && P3.F == 5)
+    if (P3.W == 1.00 && P3.X == 2.00 && P3.Y == 3.00 && P3.Z == 4.00 && P3.F == 5.00)
     {idready[2] = true;}
     break;
     
@@ -280,7 +292,11 @@ void UpdateSystemStatus(int idcheck)
   //If everything is correct, the systemready variable is set to true.
   if (idready[1] == readyconfig[1] && idready[2] == readyconfig[2] &&
       idready[3] == readyconfig[3] && idready[4] == readyconfig[4] &&
-      idready[5] == readyconfig[5]) {idready[0] = true;}
-  Serial.println("System is ready");
+      idready[5] == readyconfig[5]) 
+      {
+        idready[0] = true;
+        Serial.println("System is ready");
+      }
+  
   
 }
