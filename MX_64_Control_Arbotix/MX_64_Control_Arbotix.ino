@@ -33,47 +33,49 @@ void loop()
   {
     //feed string -> $00!0000* .... $id!angle*
     //BE SURE TO SEND THE STRING WITH 0's EVEN IF SINGLE DIGIT
-    char rd = Serial.read();
-    String srd(rd);
-    //Serial.println(rd);
-    //Serial.println(srd);
-    if (srd == ("$")) //begin reading
+    char rd = Serial.read(); //read in the character
+    String srd(rd); //convert character to string for later comparison
+
+    //Action Structure
+    if (srd == ("$")) //Beginning of reading
     {
       Serial.println("Cash Confirmed");
       counter = 0;
     }
-    else if(srd == ("!")) //start reading number
+    else if(srd == ("!")) //start reading angle
     {
       counter = 2;
       Serial.println("Exclamation Confirmed");
     }
     else if(srd == ("*")) //packet over, write angle to motor
     {
-      Serial.println("Set Reached");
+      //convert arrays to strings
       String sid(idarray);
-      //Serial.println(idarray);
-      //Serial.print(idarray[0]); Serial.println(idarray[1]);
-      Serial.print(sid); Serial.print("|");
-      currentID = sid.toInt();
-      //Serial.println(currentID + 1);
       String sangle(anglearray);
-      Serial.println(sangle);
-      //Serial.println(anglearray);
+     
+      //convert strings to numbers
+      currentID = sid.toInt();
       currentAngle = sangle.toInt();
-      SetPosition(currentID,currentAngle);
+      
+      SetPosition(currentID,currentAngle);//set angle of motor
+      
+      //print for debug
+      Serial.println("Set Reached");
+      Serial.print(sid); Serial.print("|");
+      Serial.println(sangle);
       
     }
     else if(true) //put in a number check
     {
       if (counter < 2)
       {
-        idarray[counter] = rd;
+        idarray[counter] = rd; //add number to id array
         Serial.print("idarray value set to: "); Serial.println(idarray[counter]);
         counter = counter + 1;
       }
       else if (counter < 6)
       {
-        anglearray[(counter-2)] = rd;
+        anglearray[(counter-2)] = rd; //add number to angle array
         Serial.print("anglearray value set to: "); Serial.println(anglearray[(counter-2)]);
         counter = counter + 1;
       }
@@ -81,10 +83,23 @@ void loop()
     else
     {
       Serial.println(srd.toInt());
-      Serial.println("Somethin' wrong ho");
+      Serial.println("Something went wrong");
+      PrintDebugInfo("ON");
     }
     
   }
+}
+
+void PrintDebugInfo(String bug)
+{
+  if (bug == "ON")
+  { 
+    //prints "Debug | counter | idarray | anglearray
+    Serial.println("Debug | ");
+    Serial.print(counter);Serial.print(" | ");Serial.print(idarray);
+    Serial.print(" | ");Serial.print(anglearray);
+  }
+      
 }
 
 
