@@ -72,7 +72,7 @@ MPU6050 mpu;
 Quaternion q;           // [w, x, y, z]
 
 // Reset button pins
-const int pinOut = 4; //JRG - Had to change to 1 & 2, 11&13 used by SPI
+const int pinOut = 1; //JRG - Had to change to 1 & 2, 11&13 used by SPI
 const int pinIn = 5;
 
 // MPU control / status variables
@@ -112,7 +112,7 @@ void setup(void)
 
   // Setup and configure rf radio
   radio.begin();
-  radio.setDataRate(RF24_2MBPS); // Both endpoints must have this set the same
+  radio.setDataRate(RF24_250KBPS); // Both endpoints must have this set the same
   radio.setAutoAck(false);       // Either endpoint can set to false to disable ACKs
 
   // Write on our talking pipe
@@ -166,13 +166,12 @@ void setup(void)
       // Get expected DMP packet size for later comparison
       packetSize = mpu.dmpGetFIFOPacketSize();
       
+      // Send confirmation of IMU initialization
+      Serial.println("Sending setup confirmation...");
+      radio.write( &wirelesspacket, sizeof(wirelesspacket) );
   } else {
       // ERROR!
   }
-  // Send confirmation of IMU initialization
-  Serial.println("Sending setup confirmation...");
-  radio.write( &wirelesspacket, sizeof(wirelesspacket) );
-  Serial.println("Sent");
   //digitalWrite(8, LOW);
   analogWrite(8,0);
   delay(10);
@@ -186,7 +185,7 @@ void loop(void)
   // IMU Communication // 
   // Resets length
   while (fifoCount < packetSize) fifoCount = mpu.getFIFOCount();
-  //Serial.print("FIFO Count Over | ");Serial.println(millis());
+  Serial.print("FIFO Count Over | ");Serial.println(millis());
   // Get current FIFO count
   fifoCount = mpu.getFIFOCount();
 
@@ -194,17 +193,17 @@ void loop(void)
   if (fifoCount >= 1024) {
       // Reset so we can continue cleanly
       mpu.resetFIFO();
-      //Serial.print("FIFO Reset | ");Serial.println(millis());
+      Serial.print("FIFO Reset | ");Serial.println(millis());
   } 
   
-  //Serial.print("Start Wait | ");Serial.println(millis());
+  Serial.print("Start Wait | ");Serial.println(millis());
   // Wait for correct available data length, should be a VERY short wait
   while (fifoCount < packetSize) fifoCount = mpu.getFIFOCount();
-  //Serial.print("Finish Wait | ");Serial.println(millis());
+  Serial.print("Finish Wait | ");Serial.println(millis());
 
   // Read a packet from FIFO
   mpu.getFIFOBytes(fifoBuffer, packetSize);
-  //Serial.print("Packet Read | ");Serial.println(millis());
+  Serial.print("Packet Read | ");Serial.println(millis());
        
   // Track FIFO count here in case there is > 1 packet available
   // (this lets us immediately read more without waiting for an interrupt)
@@ -212,7 +211,7 @@ void loop(void)
 
   // Display quaternion values in easy matrix form: w x y z
   mpu.dmpGetQuaternion(&q, fifoBuffer);
-  //Serial.print("Got Quaternion | ");Serial.println(millis());
+  Serial.print("Got Quaternion | ");Serial.println(millis());
 
   // Reset button status
   int reset = digitalRead(pinIn);
@@ -239,22 +238,22 @@ void loop(void)
     wirelesspacket.T = 0;
     
     //Send the data packet
-    //Serial.print("Attempting to Send Packet | "); Serial.println(millis());
+    Serial.print("Attempting to Send Packet | "); Serial.println(millis());
     radio.write( &wirelesspacket, sizeof(wirelesspacket) );
-    //Serial.print("Packet Sent | ");Serial.println(millis());
+    Serial.print("Packet Sent | ");Serial.println(millis());
   }
   //Setting the address
-  if (Serial.available())
-  {
-    // If the character on serial input is in a valid range...
-    char c = Serial.read();
-    if ( c >= '1' && c <= '6' )
-    {
-      // It is our address
-      EEPROM.write(address_at_eeprom_location,c-'0');
-
-      // And we are done right now (no easy way to soft reset)
-      printf("\n\rManually reset address to: %c\n\rPress RESET to continue!",c);
-    }
-  }
+//  if (Serial.available())
+//  {
+//    // If the character on serial input is in a valid range...
+//    char c = Serial.read();
+//    if ( c >= '1' && c <= '6' )
+//    {
+//      // It is our address
+//      EEPROM.write(address_at_eeprom_location,c-'0');
+//
+//      // And we are done right now (no easy way to soft reset)
+//      printf("\n\rManually reset address to: %c\n\rPress RESET to continue!",c);
+//    }
+//  }
 }
