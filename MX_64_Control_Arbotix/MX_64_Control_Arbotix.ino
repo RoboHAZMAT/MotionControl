@@ -14,17 +14,30 @@ int currentAngle = 0;
 char readingArray [6];
 char idarray [2] = {'3','3'};
 char anglearray [4] = {'2','0','4','8'};
+int motorarray [6] = {4,5,6,14,15,16};
 int counter = 0;
 
 void setup()
 {
   //Motor Setup
   //SetPosition(1,2000); //set the position of servo # 1 to '0'
-  
+  for (int i = 0; i < 7; i++)
+  {
+    //EEPromLock(motorarray[i],1);
+    SetLED(motorarray[i],1);
+    SetP(motorarray[i],4);
+    SetPosition(motorarray[i],2048);
+    //SetI(motorarray[i],4);
+    //SetD(motorarray[i],4);    
+  }
   delay(100);//wait for servo to move
+  
+  //Serial Setup
   Serial.begin(57142);
-  Serial.println("poop");
+  //Serial.println("poop");
   int i = 0;
+  
+  
 }
 
 void loop()
@@ -39,18 +52,21 @@ void loop()
     //Action Structure
     if (srd == ("$")) //Beginning of reading
     {
-      Serial.println("Cash Confirmed");
+      //Serial.println("Cash Confirmed");
       counter = 0;
     }
     else if(srd == ("!")) //start reading angle
     {
       counter = 2;
-      Serial.println("Exclamation Confirmed");
+      //Serial.println("Exclamation Confirmed");
     }
     else if(srd == ("*")) //packet over, write angle to motor
     {
       //convert arrays to strings
-      String sid(idarray);
+      String sid1(idarray[0]);
+      String sid2(idarray[1]);
+      String sid = sid1 + sid2;
+      //Serial.println(sid);
       String sangle(anglearray);
      
       //convert strings to numbers
@@ -60,9 +76,10 @@ void loop()
       SetPosition(currentID,currentAngle);//set angle of motor
       
       //print for debug
-      Serial.println("Set Reached");
-      Serial.print(sid); Serial.print("|");
-      Serial.println(sangle);
+      //Serial.println("Set Reached");
+      //Serial.print(sid); Serial.print("|");
+      //Serial.println(sangle);
+      
       
     }
     else if(true) //put in a number check
@@ -70,21 +87,21 @@ void loop()
       if (counter < 2)
       {
         idarray[counter] = rd; //add number to id array
-        Serial.print("idarray value set to: "); Serial.println(idarray[counter]);
+        //Serial.print("idarray value set to: "); Serial.println(idarray[counter]);
         counter = counter + 1;
       }
       else if (counter < 6)
       {
         anglearray[(counter-2)] = rd; //add number to angle array
-        Serial.print("anglearray value set to: "); Serial.println(anglearray[(counter-2)]);
+        //Serial.print("anglearray value set to: "); Serial.println(anglearray[(counter-2)]);
         counter = counter + 1;
       }
     }
     else
     {
-      Serial.println(srd.toInt());
-      Serial.println("Something went wrong");
-      PrintDebugInfo("ON");
+      //Serial.println(srd.toInt());
+      //Serial.println("Something went wrong");
+      //PrintDebugInfo("ON");
     }
     
   }

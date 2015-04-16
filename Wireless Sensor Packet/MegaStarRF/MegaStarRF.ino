@@ -12,11 +12,15 @@ Engineering Senior Design RoboHazMat Project.
 #include "ctype.h"
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 53 (normally 9 & 10 on regualr Arduinos)
-RF24 radio(53,48);
+RF24 radio(9,10);
+//RF24 radio(53,48);
 
 //comm pipes
-const uint64_t talking_pipes[5] = { 0xF0F0F0F0D2LL, 0xF0F0F0F0C3LL, 0xF0F0F0F0B4LL, 0xF0F0F0F0A5LL, 0xF0F0F0F096LL };
-const uint64_t listening_pipes[5] = { 0x3A3A3A3AD2LL, 0x3A3A3A3AC3LL, 0x3A3A3A3AB4LL, 0x3A3A3A3AA5LL, 0x3A3A3A3A96LL };
+const uint64_t talking_pipes[5] = { 0xABCDABCD71LL, 0xF0F0F0F0C3LL, 0xF0F0F0F0B4LL, 0xF0F0F0F0A5LL, 0xF0F0F0F096LL };
+const uint64_t listening_pipes[5] = { 0xABCDABCD71LL, 0x3A3A3A3AC3LL, 0x3A3A3A3AB4LL, 0x3A3A3A3AA5LL, 0x3A3A3A3A96LL };
+
+//const uint64_t talking_pipes[5] = { 0xF0F0F0F0D2LL, 0xF0F0F0F0C3LL, 0xF0F0F0F0B4LL, 0xF0F0F0F0A5LL, 0xF0F0F0F096LL };
+//const uint64_t listening_pipes[5] = { 0x3A3A3A3AD2LL, 0x3A3A3A3AC3LL, 0x3A3A3A3AB4LL, 0x3A3A3A3AA5LL, 0x3A3A3A3A96LL };
 
 // Wireless Packet Structure - quaternion and flex sensor
 // Since the biceps do not have flex sensors, the will send a 
@@ -47,14 +51,14 @@ bool readyconfig [6] = {true, true, false, false, false, false};
 void setup(void)
 {
   // Print preamble
-  Serial.begin(9600);
-  Serial.println("This is the wireless receiver.");
+  Serial.begin(115200);
+  //Serial.println("This is the wireless receiver.");
   printf_begin();
 
   // Setup and configure rf radio
   radio.begin();
   radio.setDataRate(RF24_2MBPS); // Both endpoints must have this set the same
-  radio.setAutoAck(true);       // Either endpoint can set to false to disable ACKs
+  radio.setAutoAck(false);       // Either endpoint can set to false to disable ACKs
 
   // Open pipes to other nodes for communication 
   // The pong node listens on all the ping node talking pipes
@@ -68,7 +72,7 @@ void setup(void)
   radio.startListening();
   
   //Dump the configuration of the rf unit for debugging
-  radio.printDetails();
+  //radio.printDetails();
   
   //debug initiate
   wirelesspacket.N = 0;
@@ -160,6 +164,7 @@ void loop(void)
       P6.F = wirelesspacket.F;
       P6.reset = wirelesspacket.reset;
       P6.T = wirelesspacket.T;
+      SendPacketInfo(6);
       if (!idready[0] && !idready[5]){UpdateSystemStatus(6);}
       break;
     }
@@ -207,7 +212,8 @@ void SendPacketInfo(int packetid)
     Serial.print(P2.X);Serial.print("%");
     Serial.print(P2.Y);Serial.print("&");
     Serial.print(P2.Z);Serial.print("@");
-    Serial.print(P2.reset);Serial.println("!");
+    //Serial.print(P2.reset);Serial.println("!");
+    Serial.print(P2.reset);Serial.print("!");Serial.println(P2.T);
     break;
     
     case 3:
