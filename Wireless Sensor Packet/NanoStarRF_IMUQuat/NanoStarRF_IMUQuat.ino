@@ -21,11 +21,11 @@ Engineering Senior Design RoboHazMat Project.
 RF24 radio(9,10);
 
 // Instantiate arrays with comm pipes
-const uint64_t talking_pipes[5] = { 0xABCDABCD71LL, 0xF0F0F0F0C3LL, 0xF0F0F0F0B4LL, 0xF0F0F0F0A5LL, 0xF0F0F0F096LL };
-const uint64_t listening_pipes[5] = { 0xABCDABCD71LL, 0x3A3A3A3AC3LL, 0x3A3A3A3AB4LL, 0x3A3A3A3AA5LL, 0x3A3A3A3A96LL };
+//const uint64_t talking_pipes[5] = { 0xABCDABCD71LL, 0xF0F0F0F0C3LL, 0xF0F0F0F0B4LL, 0xF0F0F0F0A5LL, 0xF0F0F0F096LL };
+//const uint64_t listening_pipes[5] = { 0xABCDABCD71LL, 0x3A3A3A3AC3LL, 0x3A3A3A3AB4LL, 0x3A3A3A3AA5LL, 0x3A3A3A3A96LL };
 
-//const uint64_t talking_pipes[5] = { 0xF0F0F0F0D2LL, 0xF0F0F0F0C3LL, 0xF0F0F0F0B4LL, 0xF0F0F0F0A5LL, 0xF0F0F0F096LL };
-//const uint64_t listening_pipes[5] = { 0x3A3A3A3AD2LL, 0x3A3A3A3AC3LL, 0x3A3A3A3AB4LL, 0x3A3A3A3AA5LL, 0x3A3A3A3A96LL };
+const uint64_t talking_pipes[5] = { 0xF0F0F0F0D2LL, 0xF0F0F0F0C3LL, 0xF0F0F0F0B4LL, 0xF0F0F0F0A5LL, 0xF0F0F0F096LL };
+const uint64_t listening_pipes[5] = { 0x3A3A3A3AD2LL, 0x3A3A3A3AC3LL, 0x3A3A3A3AB4LL, 0x3A3A3A3AA5LL, 0x3A3A3A3A96LL };
 
 // Where in EEPROM is the address stored?
 const uint8_t address_at_eeprom_location = 0;
@@ -58,6 +58,13 @@ A_t;
 
 //variable declarations
 A_t wirelesspacket;
+
+//LEDs
+int redled = 6;
+int greenled = 7;
+int blueled = 8;
+
+//int reset = 0;
 
 //IMU Quat stuff
 //============================ Parameter Setup =============================
@@ -137,22 +144,22 @@ void setup(void)
   Wire.begin();
   
   // Initialize reset button
-  pinMode(pinOut, OUTPUT);
+  //pinMode(pinOut, OUTPUT);
   pinMode(pinIn, INPUT);
   digitalWrite(pinOut, HIGH);
 
   // Initialize IMU
   Serial.println(F("Initializing I2C devices..."));
   mpu.initialize();
-  digitalWrite(6, HIGH);
+  digitalWrite(redled, HIGH);
 
   // Load and configure the DMP
   Serial.println(F("Initializing DMP..."));
   devStatus = mpu.dmpInitialize();
-  digitalWrite(6, LOW);
+  digitalWrite(redled, LOW);
   delay(10);
   //digitalWrite(8, HIGH);
-  analogWrite(8,220);
+  analogWrite(blueled,220);
   
   // Make sure it worked (returns 0 if so)
   if (devStatus == 0) {
@@ -174,10 +181,10 @@ void setup(void)
   radio.write( &wirelesspacket, sizeof(wirelesspacket) );
   Serial.println("Sent");
   //digitalWrite(8, LOW);
-  analogWrite(8,0);
+  analogWrite(blueled,150);
   delay(10);
   //digitalWrite(7, HIGH);
-  analogWrite(7,150);
+  analogWrite(greenled,150);
 
 }
 
@@ -216,6 +223,18 @@ void loop(void)
 
   // Reset button status
   int reset = digitalRead(pinIn);
+  
+  if (reset == HIGH) {     
+  // turn LED on:    
+  analogWrite(blueled, 150);
+  analogWrite(greenled, 0);  
+  } 
+  else 
+  {
+   // turn LED off:
+   analogWrite(blueled, 0);
+   analogWrite(greenled, 150); 
+  }
   
   /* Serial debug
   // Creates the communication protocol
