@@ -17,7 +17,7 @@ RF24 radio(9,10);
 
 //comm pipes
 //const uint64_t talking_pipes[5] = { 0xABCDABCD71LL, 0xF0F0F0F0C3LL, 0xF0F0F0F0B4LL, 0xF0F0F0F0A5LL, 0xF0F0F0F096LL };
-//const uint64_t listening_pipes[5] = { 0xABCDABCD71LL, 0x3A3A3A3AC3LL, 0x3A3A3A3AB4LL, 0x3A3A3A3AA5LL, 0x3A3A3A3A96LL };
+//const uint64_t listening_pipes[5] = { 0xABCDABCD71LL, 0xF0F0F0F0C3LL, 0xF0F0F0F0B4LL, 0xF0F0F0F0A5LL, 0xF0F0F0F096LL };
 
 const uint64_t talking_pipes[5] = { 0xF0F0F0F0D2LL, 0xF0F0F0F0C3LL, 0xF0F0F0F0B4LL, 0xF0F0F0F0A5LL, 0xF0F0F0F096LL };
 const uint64_t listening_pipes[5] = { 0x3A3A3A3AD2LL, 0x3A3A3A3AC3LL, 0x3A3A3A3AB4LL, 0x3A3A3A3AA5LL, 0x3A3A3A3A96LL };
@@ -46,7 +46,7 @@ bool idready [6] = {false, false, false, false, false, false};
 //the array indicating what systems need to be initialized in order for readings
 //to start being sent to matlab. Set the id's that you are using as true. All 
 //should be true when using the full system.
-bool readyconfig [6] = {true, true, true, true, true, false};
+bool readyconfig [6] = {true, false, false, false, false, false};
 
 void setup(void)
 {
@@ -72,7 +72,7 @@ void setup(void)
   radio.startListening();
   
   //Dump the configuration of the rf unit for debugging
-  //radio.printDetails();
+  radio.printDetails();
   
   //debug initiate
   wirelesspacket.N = 0;
@@ -93,7 +93,8 @@ void loop(void)
   uint8_t pipe_num; //pipe number variable
   if ( radio.available(&pipe_num) )
   {
-    //Serial.print(pipe_num);
+    Serial.print("I've got something ");
+    Serial.println(pipe_num);
     // Dump the payloads until we've gotten everything
     bool done = false;
       while (!done)
@@ -101,7 +102,18 @@ void loop(void)
         // Fetch the payload, and see if this was the last one.
         done = radio.read( &wirelesspacket, sizeof(wirelesspacket) );
       }
+    
+    Serial.print("*");Serial.print(wirelesspacket.N);
+    Serial.print("^");Serial.print(wirelesspacket.F);
+    Serial.print("$");
+    Serial.print(wirelesspacket.W);Serial.print("#");
+    Serial.print(wirelesspacket.X);Serial.print("%");
+    Serial.print(wirelesspacket.Y);Serial.print("&");
+    Serial.print(wirelesspacket.Z);Serial.print("@");
+    Serial.print(wirelesspacket.reset);Serial.println("!");
+    
     // Serial.print("Got a packet");Serial.println(millis());
+    /*
     switch (wirelesspacket.N) {
     case 0:
       Serial.print("What the hell, this packet shouldn't have been sent");
@@ -131,7 +143,7 @@ void loop(void)
       P3.F = wirelesspacket.F;
       P3.reset = wirelesspacket.reset;
       P3.T = wirelesspacket.T;
-      //SendPacketInfo(3);
+      SendPacketInfo(3);
       if (!idready[0] && !idready[2]){UpdateSystemStatus(3);}
       break;
     case 4:
@@ -171,9 +183,13 @@ void loop(void)
       if (!idready[0] && !idready[5]){UpdateSystemStatus(6);}
       break;
     }
-      
+     */ 
   }
-  
+  else
+  {
+    //Serial.println("Nothing Available");
+    
+  }
   if (Serial.available()>0)
   {
     char theid = Serial.read();
