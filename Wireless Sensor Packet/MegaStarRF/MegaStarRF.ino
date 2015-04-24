@@ -14,6 +14,9 @@ Engineering Senior Design RoboHazMat Project.
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 53 (normally 9 & 10 on regualr Arduinos)
 RF24 radio(9,10);
 //RF24 radio(53,48);
+boolean valuesset = false;
+int p = 0;
+String rd = "";
 
 //comm pipes
 //const uint64_t talking_pipes[5] = { 0xABCDABCD71LL, 0xF0F0F0F0C3LL, 0xF0F0F0F0B4LL, 0xF0F0F0F0A5LL, 0xF0F0F0F096LL };
@@ -46,7 +49,7 @@ bool idready [6] = {false, false, false, false, false, false};
 //the array indicating what systems need to be initialized in order for readings
 //to start being sent to matlab. Set the id's that you are using as true. All 
 //should be true when using the full system.
-bool readyconfig [6] = {true, true, true, true, true, false};
+bool readyconfig [6] = {true, false, false, false, false, false};
 
 void setup(void)
 {
@@ -60,13 +63,45 @@ void setup(void)
   radio.setDataRate(RF24_2MBPS); // Both endpoints must have this set the same
   radio.setAutoAck(false);       // Either endpoint can set to false to disable ACKs
 
-  // Open pipes to other nodes for communication 
+  //Reads in the true and false values which correlate
+  //to the ids that will be used for this receiver. Send in
+  //the true/false packet as "00000", where the numbers correlate
+  //to id's "23456".
+  while (!valuesset) //loops until something is available from serial link
+  {
+    while (serial.available()) //information packet comes in
+    {
+      rd = Serial.readStringUntil('\n'); //grabs packet
+    }
+    if (rd != "") //once packet is receieved, ext loop...
+    {
+      valuesset = true;
+    }
+  }
+  
+  //set the readyconfig array to received configuration
+  for (int y = 1; y < 6; y++)
+  {
+    readyconfig[y] = rd[(y-1)];
+  }
+  
+  // Open pipes to other nodes for communication
   // The pong node listens on all the ping node talking pipes
+  // hopefully this edit works, we will need to test it
+  for (int k = 0; k < 5; k++)
+  {
+    if(readyconfig[(k+1)] == true)
+    {
+      radio.openReadingPipe((k+1),talking_pipes[k]);
+    }
+  }
+  /*
   radio.openReadingPipe(1,talking_pipes[0]);
   radio.openReadingPipe(2,talking_pipes[1]);
   radio.openReadingPipe(3,talking_pipes[2]);
   radio.openReadingPipe(4,talking_pipes[3]);
   radio.openReadingPipe(5,talking_pipes[4]);
+  */
 
   //Start listening
   radio.startListening();

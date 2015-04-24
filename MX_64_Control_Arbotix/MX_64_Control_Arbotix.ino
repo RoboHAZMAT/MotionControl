@@ -9,34 +9,34 @@ Written by John Gardiner
 #include <ax12.h>
 #include <ctype.h>
 
+String srd = "";
 int currentID = 0;
 int currentAngle = 0;
-char readingArray [6];
+char readingarray [6];
 char idarray [2] = {'3','3'};
 char anglearray [4] = {'2','0','4','8'};
 int motorarray [6] = {4,5,6,14,15,16};
-int counter = 0;
+int i = 0;
 
 void setup()
 {
-  //Motor Setup
-  //SetPosition(1,2000); //set the position of servo # 1 to '0'
-  for (int i = 0; i < 7; i++)
-  {
-    //EEPromLock(motorarray[i],1);
-    SetLED(motorarray[i],1);
-    SetP(motorarray[i],4);
-    SetPosition(motorarray[i],2048);
-    //SetI(motorarray[i],4);
-    //SetD(motorarray[i],4);    
-  }
-  delay(100);//wait for servo to move
-  
   //Serial Setup
   Serial.begin(57142);
+  delay(10);
   //Serial.println("poop");
-  int i = 0;
-  
+    
+  //Set Up Motors
+  for (int i = 0; i < 6; i++)
+  {
+    SetLED(motorarray[i],1);
+    //Serial.print("Set "); Serial.print(motorarray[i]); Serial.println(" LED");
+    SetP(motorarray[i],4);
+    //SetI(motorarray[i],4);
+    //SetD(motorarray[i],4); 
+    SetPosition(motorarray[i],2048);
+    //EEPromLock(motorarray[i],1);
+    delay(1000);       
+  }
   
 }
 
@@ -44,67 +44,39 @@ void loop()
 {
   while (Serial.available() > 0) 
   {
-    //feed string -> $00!0000* .... $id!angle*
+    //feed string -> 00!0000 .... id!angle
     //BE SURE TO SEND THE STRING WITH 0's EVEN IF SINGLE DIGIT
-    char rd = Serial.read(); //read in the character
-    String srd(rd); //convert character to string for later comparison
-
-    //Action Structure
-    if (srd == ("$")) //Beginning of reading
-    {
-      //Serial.println("Cash Confirmed");
-      counter = 0;
-    }
-    else if(srd == ("!")) //start reading angle
-    {
-      counter = 2;
-      //Serial.println("Exclamation Confirmed");
-    }
-    else if(srd == ("*")) //packet over, write angle to motor
-    {
-      //convert arrays to strings
-      String sid1(idarray[0]);
-      String sid2(idarray[1]);
-      String sid = sid1 + sid2;
-      //Serial.println(sid);
-      String sangle(anglearray);
-     
-      //convert strings to numbers
-      currentID = sid.toInt();
-      currentAngle = sangle.toInt();
-      
-      SetPosition(currentID,currentAngle);//set angle of motor
-      
-      //print for debug
-      //Serial.println("Set Reached");
-      //Serial.print(sid); Serial.print("|");
-      //Serial.println(sangle);
-      
-      
-    }
-    else if(true) //put in a number check
-    {
-      if (counter < 2)
-      {
-        idarray[counter] = rd; //add number to id array
-        //Serial.print("idarray value set to: "); Serial.println(idarray[counter]);
-        counter = counter + 1;
-      }
-      else if (counter < 6)
-      {
-        anglearray[(counter-2)] = rd; //add number to angle array
-        //Serial.print("anglearray value set to: "); Serial.println(anglearray[(counter-2)]);
-        counter = counter + 1;
-      }
-    }
-    else
-    {
-      //Serial.println(srd.toInt());
-      //Serial.println("Something went wrong");
-      //PrintDebugInfo("ON");
-    }
-    
+    char reading = Serial.read();
+    if (reading == '\n'){break;}
+    readingarray[i] = Serial.read();
+    //srd = Serial.readStringUntil('\n');
+    i++;
   }
+  //srd = String(readingarray);
+  i = 0;
+  //Set char arrays
+  idarray [0] = readingarray[0];
+  idarray [1] = readingarray[1];
+  anglearray [0] = readingarray[3];
+  anglearray [1] = readingarray[4];
+  anglearray [2] = readingarray[5];
+  anglearray [3] = readingarray[6];
+  
+  //convert char arrays to strings
+  String sid(idarray);
+  String sangle(anglearray);
+  
+  //convert strings to numbers
+  currentID = sid.toInt();
+  currentAngle = sangle.toInt();
+  
+  //Set motor Angle
+  SetPosition(currentID,currentAngle);//set angle of motor
+      
+  //print for debug
+  //Serial.println("Set Reached");
+  //Serial.print(sid); Serial.print("|");
+  //Serial.println(sangle);
 }
 
 void PrintDebugInfo(String bug)
@@ -112,9 +84,9 @@ void PrintDebugInfo(String bug)
   if (bug == "ON")
   { 
     //prints "Debug | counter | idarray | anglearray
-    Serial.println("Debug | ");
-    Serial.print(counter);Serial.print(" | ");Serial.print(idarray);
-    Serial.print(" | ");Serial.print(anglearray);
+    Serial.print("Debug | ");
+    Serial.print(idarray);
+    Serial.print(" | ");Serial.println(anglearray);
   }
       
 }

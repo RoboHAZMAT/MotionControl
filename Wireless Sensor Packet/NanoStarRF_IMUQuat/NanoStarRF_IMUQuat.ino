@@ -255,6 +255,7 @@ void loop(void)
     wirelesspacket.Y = q.y;
     wirelesspacket.Z = q.z;
     wirelesspacket.F = 0; //Will be changed to analog readn
+    wirelesspacket.reset = reset;
     wirelesspacket.T = 0;
     
     //Send the data packet
