@@ -50,7 +50,7 @@ typedef struct{
   float X;
   float Y;
   float Z;// quaternion end
-  float F;// Flex sensor
+  int F;// Flex sensor
   int reset;
   int T; //Time sent
 }
@@ -147,7 +147,6 @@ void setup(void)
   wirelesspacket.Y = 3;
   wirelesspacket.Z = 4;
   wirelesspacket.F = 5;
-  wirelesspacket.T = 0;
   
   // ##### IMU Quat #####
   // Begin I2C communication
@@ -186,22 +185,10 @@ void setup(void)
   } else {
       // ERROR!
   }
-  delay(1);
-  
   // Send confirmation of IMU initialization
   Serial.println("Sending setup confirmation...");
   radio.write( &wirelesspacket, sizeof(wirelesspacket) );
   Serial.println("Sent");
-  
-  Serial.print("*");Serial.print(wirelesspacket.N);
-    Serial.print("^");Serial.print(wirelesspacket.F);
-    Serial.print("$");
-    Serial.print(wirelesspacket.W);Serial.print("#");
-    Serial.print(wirelesspacket.X);Serial.print("%");
-    Serial.print(wirelesspacket.Y);Serial.print("&");
-    Serial.print(wirelesspacket.Z);Serial.print("@");
-    Serial.print(wirelesspacket.reset);Serial.println("!");
-  
   //digitalWrite(8, LOW);
   analogWrite(blueled,150);
   delay(10);

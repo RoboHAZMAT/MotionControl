@@ -43,15 +43,16 @@ A_t wirelesspacket,P2,P3,P4,P5,P6; //Instantiate packets.
 
 //array holding the bools of system and wsp's indicating whether or not they
 //are ready to be read.
-boolean idready [6] = {false, false, false, false, false, false};
+bool idready [6] = {true, true, true, true, true, true};
 //idready -> {whole system, id2, id3, id4, id5, id6} description of vars
 
 //the array indicating what systems need to be initialized in order for readings
 //to start being sent to matlab. Set the id's that you are using as true. All 
 //should be true when using the full system.
-boolean readyconfig [6] = {true, false, false, false, false, false};
-boolean configreceived = false;
+bool readyconfig [6] = {true, true, true, true, true, true};
 
+//Serial input for idready
+boolean serialinidready = false; //change to true if you want matlab control
 
 void setup(void)
 {
@@ -64,14 +65,45 @@ void setup(void)
   radio.begin();
   radio.setDataRate(RF24_2MBPS); // Both endpoints must have this set the same
   radio.setAutoAck(false);       // Either endpoint can set to false to disable ACKs
+
+  //Reads in the true and false values which correlate
+  //to the ids that will be used for this receiver. Send in
+  //the true/false packet as "00000", where the numbers correlate
+  //to id's "23456".
+  if (serialinidready)
+  {
+    int k = 0;
+    while (!valuesset) //loops until something is available from serial link
+    {
+      if (Serial.available() > 0) //information packet comes in
+      {
+        rd[k] = Serial.read(); //grabs packet
+        k++;
+      }
+      
+      if (k == 5) //once packet is receieved, ext loop...
+      {
+        valuesset = true;
+      }
+    }
+    Serial.println(String(rd));
+    //set the readyconfig array to received configuration
+    for (int y = 1; y < 6; y++)
+    {
+      String srd = String(rd[(y-1)]);
+      if (srd.toInt() == 0){readyconfig[y] = false;}
+      else if (srd.toInt() == 1){readyconfig[y] = true;}
+      else {};
+      
+      //Serial.print(readyconfig[y]);
+    }
+  }
   
   // Open pipes to other nodes for communication
   // The pong node listens on all the ping node talking pipes
   // hopefully this edit works, we will need to test it
   // This will only open specified pipes so that if there
   // are two receivers there will not be any interference
-
-  /*
   for (int k = 0; k < 5; k++)
   {
     if(readyconfig[(k+1)])
@@ -79,22 +111,20 @@ void setup(void)
       radio.openReadingPipe((k+1),talking_pipes[k]);
     }
   }
-  */
-  
-  
+  /*
   radio.openReadingPipe(1,talking_pipes[0]);
   radio.openReadingPipe(2,talking_pipes[1]);
   radio.openReadingPipe(3,talking_pipes[2]);
   radio.openReadingPipe(4,talking_pipes[3]);
   radio.openReadingPipe(5,talking_pipes[4]);
-  
+  */
 
   //Start listening
   radio.startListening();
   
   //Dump the configuration of the rf unit for debugging
-  //radio.printDetails();
- 
+  radio.printDetails();
+  
   //debug initiate
   wirelesspacket.N = 0;
   wirelesspacket.W = 1;
@@ -104,149 +134,110 @@ void setup(void)
   wirelesspacket.F = 5;
   wirelesspacket.reset = 0;
   wirelesspacket.T = 60;
-  //Serial.println("Starting Loop");
+  
 }
 
 void loop(void)
 {
-  if (configreceived)
+
+  // if there is data ready
+  uint8_t pipe_num; //pipe number variable
+  if ( radio.available(&pipe_num) )
   {
-    //Serial.println("In the receiving loop");
-    // if there is data ready
-    uint8_t pipe_num; //pipe number variable
-    if ( radio.available(&pipe_num) )
-    {
-      //Serial.print(pipe_num);
-      // Dump the payloads until we've gotten everything
-      bool done = false;
-        while (!done)
-        {
-          // Fetch the payload, and see if this was the last one.
-          done = radio.read( &wirelesspacket, sizeof(wirelesspacket) );
-        }
-      // Serial.print("Got a packet");Serial.println(millis());
-      switch (wirelesspacket.N) {
-      case 0:
-        Serial.print("What the hell, this packet shouldn't have been sent");
-        break;
-      case 1:
-        Serial.print("ID 1 is supposed to be the receiver. Something's wrong.");
-        break;
-      case 2:
-        P2.N = wirelesspacket.N;
-        P2.W = wirelesspacket.W;
-        P2.X = wirelesspacket.X;
-        P2.Y = wirelesspacket.Y;
-        P2.Z = wirelesspacket.Z;
-        P2.F = wirelesspacket.F;
-        P2.reset = wirelesspacket.reset;
-        P2.T = wirelesspacket.T;
-        //SendPacketInfo(2);
-        //Serial.println(idready[0]); Serial.println(idready[1]);
-        if (!idready[0] && !idready[1]){UpdateSystemStatus(2);}
-        break;
-      case 3:
-        P3.N = wirelesspacket.N;
-        P3.W = wirelesspacket.W;
-        P3.X = wirelesspacket.X;
-        P3.Y = wirelesspacket.Y;
-        P3.Z = wirelesspacket.Z;
-        P3.F = wirelesspacket.F;
-        P3.reset = wirelesspacket.reset;
-        P3.T = wirelesspacket.T;
-        //SendPacketInfo(3);
-        if (!idready[0] && !idready[2]){UpdateSystemStatus(3);}
-        break;
-      case 4:
-        P4.N = wirelesspacket.N;
-        P4.W = wirelesspacket.W;
-        P4.X = wirelesspacket.X;
-        P4.Y = wirelesspacket.Y;
-        P4.Z = wirelesspacket.Z;
-        P4.F = wirelesspacket.F;
-        P4.reset = wirelesspacket.reset;
-        P4.T = wirelesspacket.T;
-        //SendPacketInfo(4);
-        if (!idready[0] && !idready[3]){UpdateSystemStatus(4);}
-        break;
-      case 5:
-        P5.N = wirelesspacket.N;
-        P5.W = wirelesspacket.W;
-        P5.X = wirelesspacket.X;
-        P5.Y = wirelesspacket.Y;
-        P5.Z = wirelesspacket.Z;
-        P5.F = wirelesspacket.F;
-        P5.reset = wirelesspacket.reset;
-        P5.T = wirelesspacket.T;
-        //SendPacketInfo(5);
-        if (!idready[0] && !idready[4]){UpdateSystemStatus(5);}
-        break;
-      case 6:
-        P6.N = wirelesspacket.N;
-        P6.W = wirelesspacket.W;
-        P6.X = wirelesspacket.X;
-        P6.Y = wirelesspacket.Y;
-        P6.Z = wirelesspacket.Z;
-        P6.F = wirelesspacket.F;
-        P6.reset = wirelesspacket.reset;
-        P6.T = wirelesspacket.T;
-        //SendPacketInfo(6);
-        if (!idready[0] && !idready[5]){UpdateSystemStatus(6);}
-        break;
-      }
-        
-    }
-    
-    if (Serial.available()>0)
-    {
-      char theid = Serial.read();
-      String stheid(theid);
-      int id = 0;
-      id = stheid.toInt();
-      if (idready[0]){
-      //Serial.println(id);
-      //Serial.println("Sending things your way");
-      SendPacketInfo(id);
-      }
-      else {Serial.println("System not ready!");}
-      delay(10);
-    }
-  }
-  else
-  {
-    //Reads in the true and false values which correlate
-    //to the ids that will be used for this receiver. Send in
-    //the true/false packet as "00000", where the numbers correlate
-    //to id's "23456".
-    int k = 0;
-    String trd = "";
-    while (Serial.available() > 0) //information packet comes in
-    {
-      trd = Serial.readStringUntil('\n'); //grabs packet
-      //k++;
-    }
-    
-    
-    
-    if (trd != "")
-    {
-      //Serial.println(trd);
-      //set the readyconfig array to received configuration
-      for (int y = 1; y < 6; y++)
+    //Serial.print(pipe_num);
+    // Dump the payloads until we've gotten everything
+    bool done = false;
+      while (!done)
       {
-        //String srd = String(rd[(y-1)]);
-        //if (srd.toInt() == 0){readyconfig[y] = false;}
-        //else if (srd.toInt() == 1){readyconfig[y] = true;}
-        //else {};
-        if (String(trd[(y-1)]).toInt() == 0){readyconfig[y] = false;}
-        else if (String(trd[(y-1)]).toInt() == 1){readyconfig[y] = true;}
-        //Serial.println(trd);
-        //Serial.println(String(readyconfig[y]));
-        //Serial.println("Got the configuration");
-        //Serial.println(readyconfig[y]);
+        // Fetch the payload, and see if this was the last one.
+        done = radio.read( &wirelesspacket, sizeof(wirelesspacket) );
       }
-      configreceived = true;
+    // Serial.print("Got a packet");Serial.println(millis());
+    switch (wirelesspacket.N) {
+    case 0:
+      Serial.print("What the hell, this packet shouldn't have been sent");
+      break;
+    case 1:
+      Serial.print("ID 1 is supposed to be the receiver. Something's wrong.");
+      break;
+    case 2:
+      P2.N = wirelesspacket.N;
+      P2.W = wirelesspacket.W;
+      P2.X = wirelesspacket.X;
+      P2.Y = wirelesspacket.Y;
+      P2.Z = wirelesspacket.Z;
+      P2.F = wirelesspacket.F;
+      P2.reset = wirelesspacket.reset;
+      P2.T = wirelesspacket.T;
+      SendPacketInfo(2);
+      //Serial.println(idready[0]); Serial.println(idready[1]);
+      if (!idready[0] && !idready[1]){UpdateSystemStatus(2);}
+      break;
+    case 3:
+      P3.N = wirelesspacket.N;
+      P3.W = wirelesspacket.W;
+      P3.X = wirelesspacket.X;
+      P3.Y = wirelesspacket.Y;
+      P3.Z = wirelesspacket.Z;
+      P3.F = wirelesspacket.F;
+      P3.reset = wirelesspacket.reset;
+      P3.T = wirelesspacket.T;
+      SendPacketInfo(3);
+      if (!idready[0] && !idready[2]){UpdateSystemStatus(3);}
+      break;
+    case 4:
+      P4.N = wirelesspacket.N;
+      P4.W = wirelesspacket.W;
+      P4.X = wirelesspacket.X;
+      P4.Y = wirelesspacket.Y;
+      P4.Z = wirelesspacket.Z;
+      P4.F = wirelesspacket.F;
+      P4.reset = wirelesspacket.reset;
+      P4.T = wirelesspacket.T;
+      SendPacketInfo(4);
+      if (!idready[0] && !idready[3]){UpdateSystemStatus(4);}
+      break;
+    case 5:
+      P5.N = wirelesspacket.N;
+      P5.W = wirelesspacket.W;
+      P5.X = wirelesspacket.X;
+      P5.Y = wirelesspacket.Y;
+      P5.Z = wirelesspacket.Z;
+      P5.F = wirelesspacket.F;
+      P5.reset = wirelesspacket.reset;
+      P5.T = wirelesspacket.T;
+      SendPacketInfo(5);
+      if (!idready[0] && !idready[4]){UpdateSystemStatus(5);}
+      break;
+    case 6:
+      P6.N = wirelesspacket.N;
+      P6.W = wirelesspacket.W;
+      P6.X = wirelesspacket.X;
+      P6.Y = wirelesspacket.Y;
+      P6.Z = wirelesspacket.Z;
+      P6.F = wirelesspacket.F;
+      P6.reset = wirelesspacket.reset;
+      P6.T = wirelesspacket.T;
+      SendPacketInfo(6);
+      if (!idready[0] && !idready[5]){UpdateSystemStatus(6);}
+      break;
     }
+      
+  }
+  
+  if (Serial.available()>0)
+  {
+    char theid = Serial.read();
+    String stheid(theid);
+    int id = 0;
+    id = stheid.toInt();
+    if (idready[0]){
+    //Serial.println(id);
+    //Serial.println("Sending things your way");
+    SendPacketInfo(id);
+    }
+    else {Serial.println("System not ready!");}
+    delay(10);
   }
   
 }
@@ -276,7 +267,7 @@ void SendPacketInfo(int packetid)
     Serial.print(P2.Y);Serial.print("&");
     Serial.print(P2.Z);Serial.print("@");
     //Serial.print(P2.reset);Serial.println("!");
-    Serial.print(P2.reset);Serial.println("!");//Serial.println(P2.T);
+    Serial.print(P2.reset);Serial.print("!");Serial.println(P2.T);
     break;
     
     case 3:
@@ -342,17 +333,17 @@ void UpdateSystemStatus(int idcheck)
     break;
     
     case 4:
-    if (P4.W == 1.00 && P4.X == 2.00 && P4.Y == 3.00 && P4.Z == 4.00 && P4.F == 5.00)
+    if (P4.W == 1 && P4.X == 2 && P4.Y == 3 && P4.Z == 4 && P4.F == 5)
     {idready[3] = true;}
     break;
     
     case 5:
-    if (P5.W == 1.00 && P5.X == 2.00 && P5.Y == 3.00 && P5.Z == 4.00 && P5.F == 5.00)
+    if (P5.W == 1 && P5.X == 2 && P5.Y == 3 && P5.Z == 4 && P5.F == 5)
     {idready[4] = true;}
     break;
     
     case 6:
-    if (P6.W == 1.00 && P6.X == 2.00 && P6.Y == 3.00 && P6.Z == 4.00 && P6.F == 5.00)
+    if (P6.W == 1 && P6.X == 2 && P6.Y == 3 && P6.Z == 4 && P6.F == 5)
     {idready[5] = true;}
     break;
   }
